@@ -6,7 +6,6 @@ except AttributeError:
     pass
 # ---------------------------------------
 
-# NAPRAWA WYKRESÓW 3D W LINUKSIE
 import matplotlib
 matplotlib.use('TkAgg') # Wymuszenie otwierania okienek
 
@@ -56,7 +55,7 @@ def spoof_adsb_target(vehicle, ufo_gps):
         emitter_type=10, 
         tslc=1, 
         flags=flags,
-        squawk=1200  # <--- Brakujący parametr!
+        squawk=1200
     )
     vehicle.send_mavlink(msg)
 
@@ -84,7 +83,7 @@ while vehicle.location.global_relative_frame.alt < 9.5: time.sleep(1)
 # Cel (UFO) zaczyna z pozycji 100m na wschód, 150m na północ, wysokość 30m
 ufo_x, ufo_y, ufo_z = 150.0, 100.0, 30.0
 # UFO przemieszcza się powoli w stronę wschodnią i lekko opada
-ufo_vx, ufo_vy, ufo_vz = 0.5, 3.0, -0.2 
+ufo_vx, ufo_vy, ufo_vz = 0.25, 1.0, -0.2 
 
 # Konfiguracja Wykresu 3D
 plt.ion()
@@ -94,86 +93,107 @@ ax = fig.add_subplot(111, projection='3d')
 drone_xs, drone_ys, drone_zs = [], [], []
 ufo_xs, ufo_ys, ufo_zs = [], [], []
 
-PREDKOSC_DRONA = 15.0 # m/s (Podkręcamy prędkość naszego myśliwca)
+PREDKOSC_DRONA = 15.0 # m/s
 
-print("Rozpoczęto pościg! Śledź mapę MAVProxy oraz okno 3D.")
+print("Rozpoczęto pościg wyprzedzający! Śledź mapę MAVProxy oraz okno 3D.")
+
+# Zmienna do śledzenia RZECZYWISTEGO czasu
+last_time = time.time()
 
 while True:
-    dt = 0.5 # Krok czasu (symulacyjny)
+    # 1. RZECZYWISTY KROK CZASU (Zabezpiecza przed "zagięciem czasu")
+    current_time = time.time()
+    dt = current_time - last_time
+    last_time = current_time
+    if dt > 1.0 or dt == 0: dt = 0.1 
     
-    # 1. Odczyt pozycji drona
+    # 2. Odczyt pozycji drona
     loc = vehicle.location.local_frame
     if loc.north is None: continue
     dx, dy, dz = loc.north, loc.east, -loc.down
     
-    # 2. Aktualizacja pozycji UFO (Fizyka celu)
+    # 3. Aktualizacja pozycji UFO (Teraz mnożymy przez rzeczywisty czas 'dt')
     ufo_x += ufo_vx * dt
     ufo_y += ufo_vy * dt
     ufo_z += ufo_vz * dt
     
-    # Opcjonalnie: Symulacja wiatru (UFO leci po sinusoidzie)
-    # ufo_y += math.sin(time.time()) * 2.0 
-    
-    # 3. WYSYŁANIE SYGNAŁU NA RADAR (Fałszowanie ADS-B)
+    # Wysyłanie sygnału na radar
     ufo_gps = get_location_metres(baza_gps, ufo_x, ufo_y)
     ufo_gps.alt = ufo_z
     spoof_adsb_target(vehicle, ufo_gps)
     
-    # 4. Algorytm Pure Pursuit (Naprowadzanie)
-    vec_x = ufo_x - dx
-    vec_y = ufo_y - dy
-    vec_z = ufo_z - dz
+    # 4. === MATEMATYCZNY ALGORYTM WYPRZEDZANIA (Predictive Intercept) ===
+    dist_x = ufo_x - dx
+    dist_y = ufo_y - dy
+    dist_z = ufo_z - dz
     
-    dystans = math.sqrt(vec_x**2 + vec_y**2 + vec_z**2)
+    v_target_sq = ufo_vx**2 + ufo_vy**2 + ufo_vz**2
+    v_drone_sq = PREDKOSC_DRONA**2
     
-    if dystans < 3.0:
-        print("CEL PRZECHWYCONY!")
+    # Współczynniki równania kwadratowego
+    a = v_drone_sq - v_target_sq
+    b = 2.0 * (dist_x * ufo_vx + dist_y * ufo_vy + dist_z * ufo_vz)
+    c = -(dist_x**2 + dist_y**2 + dist_z**2)
+    
+    discriminant = b**2 - 4.0 * a * c
+    t_intercept = 0.0
+    
+    if discriminant >= 0 and a > 0:
+        t_intercept = (b + math.sqrt(discriminant)) / (2.0 * a)
+        if t_intercept < 0: t_intercept = 0.0
+    
+    # Wektor wyprzedzający (Gdzie cel BĘDZIE, a nie gdzie JEST)
+    dir_x = (ufo_x + ufo_vx * t_intercept) - dx
+    dir_y = (ufo_y + ufo_vy * t_intercept) - dy
+    dir_z = (ufo_z + ufo_vz * t_intercept) - dz
+    
+    real_distance = math.sqrt(dist_x**2 + dist_y**2 + dist_z**2)
+    
+    if real_distance < 4.0:
+        print("CEL ZESTRZELONY (Przechwycono wektorowo)!")
         send_ned_velocity(vehicle, 0, 0, 0)
         break
         
-    # Normalizacja wektora
-    cmd_vx = (vec_x / dystans) * PREDKOSC_DRONA
-    cmd_vy = (vec_y / dystans) * PREDKOSC_DRONA
-    cmd_vz = -(vec_z / dystans) * PREDKOSC_DRONA 
-    
-    send_ned_velocity(vehicle, cmd_vx, cmd_vy, cmd_vz)
+    vector_len = math.sqrt(dir_x**2 + dir_y**2 + dir_z**2)
+    if vector_len > 0:
+        cmd_vx = (dir_x / vector_len) * PREDKOSC_DRONA
+        cmd_vy = (dir_y / vector_len) * PREDKOSC_DRONA
+        cmd_vz = -(dir_z / vector_len) * PREDKOSC_DRONA 
+        send_ned_velocity(vehicle, cmd_vx, cmd_vy, cmd_vz)
     
     # 5. Aktualizacja Wykresu 3D
     drone_xs.append(dx); drone_ys.append(dy); drone_zs.append(dz)
     ufo_xs.append(ufo_x); ufo_ys.append(ufo_y); ufo_zs.append(ufo_z)
     
     ax.clear()
-    ax.set_title(f'Pościg 3D (Dystans: {dystans:.1f}m)')
+    ax.set_title(f'Pościg Wyprzedzający 3D (Dystans: {real_distance:.1f}m)')
     
-    # Szukamy najmniejszych i największych wartości w historii lotu drona i ufo
     min_x = min(min(drone_xs), min(ufo_xs)) - 20
     max_x = max(max(drone_xs), max(ufo_xs)) + 20
-    
     min_y = min(min(drone_ys), min(ufo_ys)) - 20
     max_y = max(max(drone_ys), max(ufo_ys)) + 20
-    
     max_z = max(max(drone_zs), max(ufo_zs)) + 20
     
-    # Aktualizujemy limity wykresu na żywo
     ax.set_xlim([min_x, max_x])
     ax.set_ylim([min_y, max_y])
     ax.set_zlim([0, max_z if max_z > 20 else 20])
     
-    ax.plot(drone_xs, drone_ys, drone_zs, color='blue', label='Dron')
-    ax.plot(ufo_xs, ufo_ys, ufo_zs, color='red', label='Balon')
+    ax.plot(drone_xs, drone_ys, drone_zs, color='blue', label='Myśliwiec')
+    ax.plot(ufo_xs, ufo_ys, ufo_zs, color='red', label='Cel')
     ax.scatter(dx, dy, dz, color='blue')
-    ax.scatter(ufo_x, ufo_y, ufo_z, color='red', marker='o', s=100) # s=100 to duży punkt
+    ax.scatter(ufo_x, ufo_y, ufo_z, color='red', marker='o', s=100)
     
-    ax.plot([dx, ufo_x], [dy, ufo_y], [dz, ufo_z], color='green', linestyle='--')
+    # Rysujemy celownik wyprzedzający
+    ax.plot([dx, ufo_x + ufo_vx * t_intercept], 
+            [dy, ufo_y + ufo_vy * t_intercept], 
+            [dz, ufo_z + ufo_vz * t_intercept], color='gold', linestyle='--')
+            
     ax.legend()
-    
     plt.draw()
-    plt.pause(0.1) # Wymagane przez TkAgg do płynnego odświeżania
+    plt.pause(0.05)
 
 print("Wracam do bazy (RTL).")
 vehicle.mode = VehicleMode("RTL")
 vehicle.close()
-
-# Trzymaj okienko wykresu otwarte po zakończeniu
 plt.ioff()
 plt.show()
