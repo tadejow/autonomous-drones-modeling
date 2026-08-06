@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Uruchamianie Chmury Dronów (SITL)..."
+echo "Initializing Drone Swarm with 1 leader-drone (SITL)..."
 
 # Zabijamy stare procesy
 killall arducopter mavproxy.py xterm 2>/dev/null
@@ -15,4 +15,4 @@ xterm -hold -e "bash -c 'source ~/.profile; $KATALOG; sim_vehicle.py -v ArduCopt
 # Dron 2 (Sąsiad B)
 xterm -hold -e "bash -c 'source ~/.profile; $KATALOG; sim_vehicle.py -v ArduCopter --no-rebuild -f + -I2 --sysid 3 -l -35.3627,149.1649,584,0 --out=127.0.0.1:14570'" &
 
-echo "SITL uruchomiony!"
+echo "SITL instances deployed in the background!"

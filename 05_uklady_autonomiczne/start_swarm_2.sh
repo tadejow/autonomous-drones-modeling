@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Uruchamianie Chmury 8 Dronów w dwóch klastrach (SITL)..."
+echo "Initializing 8-Drone Swarm (SITL)..."
 
 killall arducopter mavproxy.py xterm 2>/dev/null
 KATALOG="cd ~/ardupilot/ArduCopter"
@@ -18,4 +18,4 @@ xterm -hold -e "bash -c 'source ~/.profile; $KATALOG; sim_vehicle.py -v ArduCopt
 xterm -hold -e "bash -c 'source ~/.profile; $KATALOG; sim_vehicle.py -v ArduCopter --no-rebuild -f + -I6 --sysid 7 -l -35.3628,149.1652,584,0 --out=127.0.0.1:14610'" &
 xterm -hold -e "bash -c 'source ~/.profile; $KATALOG; sim_vehicle.py -v ArduCopter --no-rebuild -f + -I7 --sysid 8 -l -35.3628,149.1653,584,0 --out=127.0.0.1:14620'" &
 
-echo "SITL uruchomiony!"
+echo "SITL instances deployed in the background!"
