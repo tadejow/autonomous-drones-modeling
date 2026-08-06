@@ -86,13 +86,3 @@ Złotą zasadą symulacji BSP jest rozdzielenie silnika fizyki (serwera) od skry
 ## 📜 Licencja
 
 Ten projekt udostępniany jest na licencji [MIT](LICENSE), zachęcając do swobodnego modyfikowania, rozwijania i dzielenia się wiedzą w celach edukacyjnych i naukowych.
-
-### Ostatni krok przed końcem dnia
-
-Skoro uaktualniłeś treść wszystkich plików modułów oraz stworzyłeś dokumentację główną, musisz to jeszcze pchnąć do swojego repozytorium. W swoim terminalu Ubuntu użyj sprawdzonej kombinacji:
-
-```bash
-git add .
-git commit -m "Aktualizacja kodów do standardu PEP8, refaktoryzacja, dodanie pliku README"
-git push
-```
