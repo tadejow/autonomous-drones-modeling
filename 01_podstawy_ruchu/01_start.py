@@ -1,62 +1,65 @@
+# --- PYTHON 3.14 COMPATIBILITY PATCH ---
 import collections
 try:
     collections.MutableMapping = collections.abc.MutableMapping
 except AttributeError:
     pass
+# ---------------------------------------
 
-from dronekit import connect, VehicleMode
 import time
+from dronekit import connect, VehicleMode
 
-# 1. Połączenie z symulatorem. 
-# Gdy sim_vehicle działa, tworzy router MAVProxy, który udostępnia drona na porcie UDP 14550.
-print("Łączenie z dronem...")
-vehicle = connect('udp:127.0.0.1:14550', wait_ready=True)
-print("Połączono pomyślnie!\n")
+def main():
+    # 1. Connect to the SITL simulator
+    connection_string = 'udp:127.0.0.1:14550'
+    print(f"Connecting to vehicle on: {connection_string}")
+    vehicle = connect(connection_string, wait_ready=True)
+    print("Successfully connected!\n")
 
-# 2. Sprawdzenie, czy dron ma sygnał GPS i jest gotowy do lotu
-while not vehicle.is_armable:
-    print(" Czekam na inicjalizację drona (szukam GPS)...")
-    time.sleep(1)
-print("Dron gotowy do lotu!")
+    # 2. Wait for the autopilot to initialize (e.g., acquire GPS lock)
+    print("Waiting for vehicle to initialize (GPS lock)...")
+    while not vehicle.is_armable:
+        time.sleep(1)
+    print("Vehicle is ready to arm!")
 
-# 3. Zmiana trybu na GUIDED
-# Tylko w trybie GUIDED dron "słucha" poleceń z Pythona dotyczących ruchu.
-print("Zmiana trybu lotu na GUIDED...")
-vehicle.mode = VehicleMode("GUIDED")
+    # 3. Set mode to GUIDED
+    print("Setting mode to GUIDED...")
+    vehicle.mode = VehicleMode("GUIDED")
 
-# 4. Uzbrojenie silników (Arming)
-print("Uzbrajanie silników...")
-vehicle.armed = True
+    # 4. Arm the motors
+    print("Arming motors...")
+    vehicle.armed = True
+    while not vehicle.armed:
+        print(" Waiting for arming...")
+        time.sleep(1)
+    print("Motors armed! (Caution: propellers spinning)")
 
-# Czekamy, aż silniki faktycznie się zakręcą
-while not vehicle.armed:
-    print(" Czekam na uzbrojenie...")
-    time.sleep(1)
-print("Silniki uzbrojone! (Uwaga na śmigła)")
+    # 5. Takeoff procedure
+    target_altitude = 10.0
+    print(f"Taking off to {target_altitude} meters...")
+    vehicle.simple_takeoff(target_altitude)
 
-# 5. Start (Takeoff)
-docelowa_wysokosc = 10.0
-print(f"Startujemy na wysokość: {docelowa_wysokosc} metrów")
-vehicle.simple_takeoff(docelowa_wysokosc)
+    # Monitoring the altitude
+    while True:
+        current_altitude = vehicle.location.global_relative_frame.alt
+        print(f" Current altitude: {current_altitude:.1f} m")
+        
+        # Break the loop if we reach 95% of target altitude
+        if current_altitude >= target_altitude * 0.95:
+            print("Target altitude reached!")
+            break
+        time.sleep(1)
 
-# Pętla sprawdzająca aktualną wysokość
-while True:
-    aktualna_wysokosc = vehicle.location.global_relative_frame.alt
-    print(f" Aktualna wysokość: {aktualna_wysokosc:.1f} m")
-    
-    # Jeśli osiągniemy 95% wysokości docelowej, przerywamy pętlę
-    if aktualna_wysokosc >= docelowa_wysokosc * 0.95:
-        print("Osiągnięto wysokość przelotową!")
-        break
-    time.sleep(1)
+    # 6. Hover and return
+    print("Hovering for 5 seconds...")
+    time.sleep(5)
 
-# 6. Zawis i powrót na ziemię
-print("Wiszę w powietrzu przez 5 sekund...")
-time.sleep(5)
+    print("Returning to Launch (RTL mode)...")
+    vehicle.mode = VehicleMode("RTL")
 
-print("Wracam na miejsce startu (Tryb RTL)...")
-vehicle.mode = VehicleMode("RTL")  # RTL = Return To Launch
+    # Close connection
+    vehicle.close()
+    print("Mission completed. Vehicle connection closed.")
 
-# Zamykamy połączenie ze statkiem
-vehicle.close()
-print("Koniec misji.")
+if __name__ == "__main__":
+    main()
