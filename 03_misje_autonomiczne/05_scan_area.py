@@ -1,4 +1,4 @@
-# --- ŁATKA DLA NOWYCH WERSJI PYTHONA ---
+# --- PYTHON 3.14 COMPATIBILITY PATCH ---
 import collections
 try:
     collections.MutableMapping = collections.abc.MutableMapping
@@ -6,103 +6,122 @@ except AttributeError:
     pass
 # ---------------------------------------
 
-from dronekit import connect, VehicleMode, LocationGlobalRelative, Command
-from pymavlink import mavutil
 import time
 import math
+from dronekit import connect, VehicleMode, LocationGlobalRelative, Command
+from pymavlink import mavutil
 
-def get_location_metres(original_location, dNorth, dEast):
+# ==========================================
+# MATH & KINEMATICS UTILITIES
+# ==========================================
+
+def get_location_meters(original_location: LocationGlobalRelative, d_north: float, d_east: float) -> LocationGlobalRelative:
+    """Calculates a new GPS coordinate based on a shift in meters (North, East)."""
     earth_radius = 6378137.0
-    dLat = dNorth / earth_radius
-    dLon = dEast / (earth_radius * math.cos(math.pi * original_location.lat / 180))
-    newlat = original_location.lat + (dLat * 180 / math.pi)
-    newlon = original_location.lon + (dLon * 180 / math.pi)
-    return LocationGlobalRelative(newlat, newlon, original_location.alt)
+    d_lat = d_north / earth_radius
+    d_lon = d_east / (earth_radius * math.cos(math.pi * original_location.lat / 180.0))
+    new_lat = original_location.lat + (d_lat * 180.0 / math.pi)
+    new_lon = original_location.lon + (d_lon * 180.0 / math.pi)
+    return LocationGlobalRelative(new_lat, new_lon, original_location.alt)
 
-def clear_mission(vehicle):
+def clear_mission(vehicle) -> None:
+    """Clears the current mission from the vehicle's memory."""
     cmds = vehicle.commands
     cmds.clear()
     cmds.upload()
 
-def generate_lawnmower_mission(vehicle, start_loc, width, height, swath_width, altitude):
-    print("Generowanie optymalnej trasy skanowania...")
+def generate_lawnmower_mission(vehicle, start_loc: LocationGlobalRelative, width: float, length: float, swath_width: float, altitude: float) -> None:
+    """
+    Generates and uploads an optimal coverage path (Lawnmower algorithm).
+    """
+    print("Generating optimal scanning route (Boustrophedon path)...")
     cmds = vehicle.commands
     
-    # 0. Wymagany przez protokół MAVLink - dodanie punktu domowego
+    # 0. Required by MAVLink - add a dummy home point
     cmds.add(Command(0, 0, 0, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT, mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, 1, 0, 0, 0, 0, start_loc.lat, start_loc.lon, altitude))
 
-    current_east = 0
-    direction = 1 
+    current_east = 0.0
+    direction = 1  # 1 for North-bound, -1 for South-bound
 
-    # 1. Generowanie algorytmu zig-zag (Kosiarka)
+    # 1. Generate zig-zag pattern
     while current_east <= width:
-        target_north = height if direction == 1 else 0
-        wp_gps = get_location_metres(start_loc, target_north, current_east)
+        target_north = length if direction == 1 else 0.0
+        wp_gps = get_location_meters(start_loc, target_north, current_east)
         
-        # ZWRÓĆ UWAGĘ: Parametr autocontinue = 1 (zamiast 0)
+        # Note: autocontinue parameter is set to 1
         cmds.add(Command(0, 0, 0, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT, mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, 1, 0, 0, 0, 0, wp_gps.lat, wp_gps.lon, altitude))
         
         current_east += swath_width
         direction *= -1 
 
-    # 2. Zakończenie misji i powrót (RTL) z autocontinue=1
+    # 2. End mission and Return To Launch (RTL)
     cmds.add(Command(0, 0, 0, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT, mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH, 0, 1, 0, 0, 0, 0, 0, 0, 0))
 
-    print("Wgrywanie misji do autopilota...")
+    print("Uploading mission to autopilot...")
     cmds.upload()
-    print(f"Zakończono! Wgrano punktów misji: {cmds.count}")
+    print(f"Mission uploaded successfully! Total waypoints: {cmds.count}")
 
 
 # ==========================================
-# GŁÓWNA LOGIKA PROGRAMU
+# MAIN PROGRAM LOGIC
 # ==========================================
 
-print("Łączenie z dronem...")
-vehicle = connect('udp:127.0.0.1:14550', wait_ready=True)
+def main():
+    print("Connecting to vehicle...")
+    vehicle = connect('udp:127.0.0.1:14550', wait_ready=True)
 
-print("Czekam na satelity (Fix GPS)...")
-while not vehicle.is_armable:
-    time.sleep(1)
+    # Disable battery failsafe for simulation purposes
+    vehicle.parameters['BATT_FS_LOW_ACT'] = 0
+    vehicle.parameters['BATT_FS_CRT_ACT'] = 0
 
-start_location = vehicle.location.global_relative_frame
+    print("Waiting for GPS lock...")
+    while not vehicle.is_armable:
+        time.sleep(1)
 
-WYSOKOSC = 20         
-SZEROKOSC_POLA = 80   
-DLUGOSC_POLA = 100    
-SZEROKOSC_SKANU = 15  
+    start_location = vehicle.location.global_relative_frame
 
-clear_mission(vehicle)
-generate_lawnmower_mission(vehicle, start_location, SZEROKOSC_POLA, DLUGOSC_POLA, SZEROKOSC_SKANU, WYSOKOSC)
+    # Mission parameters
+    ALTITUDE = 20.0         
+    FIELD_WIDTH = 80.0   
+    FIELD_LENGTH = 100.0    
+    SWATH_WIDTH = 15.0  
 
-# Najbezpieczniejsza procedura: Startujemy w GUIDED...
-print("\nUzbrajam silniki i startuję (GUIDED)...")
-vehicle.mode = VehicleMode("GUIDED")
-vehicle.armed = True
-while not vehicle.armed:
-    time.sleep(1)
+    clear_mission(vehicle)
+    generate_lawnmower_mission(vehicle, start_location, FIELD_WIDTH, FIELD_LENGTH, SWATH_WIDTH, ALTITUDE)
 
-vehicle.simple_takeoff(WYSOKOSC)
-while True:
-    if vehicle.location.global_relative_frame.alt >= WYSOKOSC * 0.95:
-        print("Wysokość przelotowa osiągnięta!")
-        break
-    time.sleep(1)
+    # Safe takeoff procedure in GUIDED mode
+    print("\nArming motors and taking off (GUIDED mode)...")
+    vehicle.mode = VehicleMode("GUIDED")
+    vehicle.armed = True
+    while not vehicle.armed:
+        time.sleep(1)
 
-# ... i dopiero w powietrzu oddajemy kontrolę trybowi AUTO!
-print("Przełączam na tryb AUTO - Dron rozpoczyna skanowanie!")
-vehicle.commands.next = 1 # Upewniamy się, że zaczyna od pierwszego właściwego punktu
-vehicle.mode = VehicleMode("AUTO")
+    vehicle.simple_takeoff(ALTITUDE)
+    while True:
+        if vehicle.location.global_relative_frame.alt >= ALTITUDE * 0.95:
+            print("Cruising altitude reached!")
+            break
+        time.sleep(1)
 
-while True:
-    nastepny_punkt = vehicle.commands.next
-    ilosc_punktow = vehicle.commands.count
-    
-    print(f"[Monitoring] Dron leci do Waypointa: {nastepny_punkt} / {ilosc_punktow}")
-    
-    if vehicle.mode.name == "RTL":
-        print("Skanowanie zakończone. Dron wraca do bazy!")
-        break
-    time.sleep(2)
+    # Hand over control to AUTO mode
+    print("Switching to AUTO mode - Autopilot takes control over the mission!")
+    vehicle.commands.next = 1 # Ensure it starts from the first actual waypoint
+    vehicle.mode = VehicleMode("AUTO")
 
-vehicle.close()
-print("Koniec nadzoru.")
+    # Monitoring loop
+    while True:
+        next_waypoint = vehicle.commands.next
+        total_waypoints = vehicle.commands.count
+        
+        print(f"[Monitoring] Navigating to Waypoint: {next_waypoint} / {total_waypoints}")
+        
+        if vehicle.mode.name == "RTL":
+            print("Scanning complete. Vehicle is returning to base!")
+            break
+        time.sleep(2)
+
+    vehicle.close()
+    print("Supervision ended. Connection closed.")
+
+if __name__ == "__main__":
+    main()
