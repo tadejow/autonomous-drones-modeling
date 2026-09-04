@@ -1,0 +1,20 @@
+\chapter{Programistyczne podstawy}
+% =======================================================
+\section{Architektura systemów bezzałogowych (Hardware i Software)}
+% Teoria: Rola Autopilota (Flight Controller) vs Komputer Pokładowy (Companion Computer).
+
+\section{Symulator SITL i protokół MAVLink}
+% Teoria: Software-In-The-Loop. Architektura klient-serwer. UDP i TCP w komunikacji MAVLink.
+\subsection{Przykład praktyczny: Inicjalizacja środowiska i pierwszy rozruch}
+% Bash/Kod: Skrypt startowy w bashu z komendami uruchamiającymi drona oraz wirtualne środowisko (venv).
+
+\section{Paradygmat asynchroniczny i tryby lotu}
+% Teoria: Rola pre-arm checks. Opóźnienia systemowe. Różnice między trybami GUIDED (sterowanie zewnętrzne), AUTO (wykonanie misji z EEPROM) i RTL.
+\subsection{Przykład praktyczny: Bezpieczna maszyna stanów}
+% Kod Python: Skrypt 01_start.py. Blokująca pętla oczekująca na wysokość przelotową.
+
+\section{Nawigacja punktowa a kontrola wektorowa}
+% Teoria: simple_goto() (wysłanie do punktu) kontra send_ned_velocity() (bezpośrednia ingerencja w wektor prędkości).
+\subsection{Przykład praktyczny: Pętla nadążna z tolerancją zbieżności}
+% Kod Python: Skrypt 02_trajectory.py z implementacją sprawdzania promienia akceptacji celu.
+

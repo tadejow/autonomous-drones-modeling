@@ -1,0 +1,26 @@
+\chapter{Wprowadzenie}
+% =======================================================
+\epigraph{\textit{„Lotnictwo to jedyna branża, w której błąd w równaniu matematycznym może natychmiast uderzyć w ziemię z prędkością 100 kilometrów na godzinę.”}}{\ldots z inżynierskiego folkloru}
+
+\section{Od maszyny zdalnie sterowanej do agenta autonomicznego}
+
+Kiedy myślimy o bezzałogowych statkach powietrznych (BSP), potocznie nazywanych dronami, najczęściej wyobrażamy sobie człowieka stojącego na ziemi z aparaturą RC (Radio Control) w dłoniach. W takim modelu człowiek jest pilotem: jego układ nerwowy analizuje obraz, a dłonie wychylają drążki, korygując na bieżąco lot maszyny. 
+
+Jednak współczesny przemysł, geodezja, nowoczesne rolnictwo czy logistyka wymuszają zmianę tego paradygmatu. Przy zadaniach wymagających milimetrowej precyzji, takich jak wielogodzinne skanowanie połaci lasu czy loty w zwartym roju, ludzka percepcja i czas reakcji stają się niewystarczające. Statek powietrzny przestaje być zdalnie sterowaną zabawką, a staje się \textbf{agentem autonomicznym}. 
+
+W tym nowym ujęciu człowiek przestaje pełnić funkcję \textit{pilota}, a staje się \textit{nadzorcą}. Zamiast korygować wychylenie silników w czasie rzeczywistym, inżynier zadaje maszynie \textbf{cel zdefiniowany matematycznie}. To wbudowane w drona algorytmy muszą samodzielnie przeliczyć wektory przyspieszeń, skompensować wiatr i ostatecznie podjąć decyzję o tym, jaką moc przekazać na konkretne wirniki.
+
+
+\section{Dlaczego matematyka wygrywa z joystickiem?}
+
+Podstawowym celem tego skryptu jest wypełnienie luki między teoretyczną analizą matematyczną a surową fizyką programowania maszyn. Świat wirtualny, w którym na co dzień działają algorytmy informatyczne, jest wyidealizowany i przewidywalny. Świat fizyczny wręcz przeciwnie, podlega bezwładności, grawitacji i zakłóceniom zewnętrznym (takim jak szum sensorów czy podmuchy wiatru).
+
+Aby dron mógł skutecznie połączyć te dwa światy, niezbędny jest odpowiedni system obliczeniowy. W trakcie niniejszego kursu udowodnimy, dlaczego solidny aparat matematyczny pozwala na tworzenie systemów niezawodnych. Zamiast manualnego operowania dronem, nauczymy się:
+
+\begin{itemize}
+    \item \textbf{Ciągłego planowania trajektorii} -- wykorzystania równań parametrycznych i analizy wektorowej, aby uniknąć konieczności zatrzymywania się statku w przestrzeni.
+    \item \textbf{Optymalizacji misji} -- zastosowania geometrii obliczeniowej i teorii grafów (np. problemu komiwojażera) w celu maksymalizacji pokrycia terenu przy minimalnym zużyciu zasobów baterii.
+    \item \textbf{Robotyki roju (Swarm Robotics)} -- przeniesienia koncepcji znanych z biologii (np. klucze ptaków) na modele układów dynamicznych (takich jak hybrydowy model Cuckera-Smale'a), gdzie lokalne interakcje matematyczne jednostek prowadzą do inteligentnych, emergentnych zachowań całej grupy, całkowicie bez udziału centralnego komputera sterującego.
+\end{itemize}
+
+Kurs ten został stworzony z myślą o studentach kierunków ścisłych, którzy posiadają już aparat analityczny, ale chcą zobaczyć, w jaki sposób zredukować go do linii kodu i wysłać w powietrze. Za pomocą profesjonalnego środowiska symulacyjnego (SITL) oraz protokołu wymiany danych (MAVLink), przejdziesz proces od zdefiniowania abstrakcyjnego równania na kartce, aż do przeprowadzenia stabilnego lotu wysoce zautomatyzowanego drona.

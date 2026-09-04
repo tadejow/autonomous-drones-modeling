@@ -1,0 +1,236 @@
+\chapter{Matematyczne podstawy}
+% =======================================================
+\epigraph{\textit{„Matematyka jest alfabetem, za pomocą którego Bóg opisał wszechświat.”}}{--- Galileusz}
+
+\section{Układy współrzędnych i ich transformacje}
+
+Planowanie lotu i wyznaczanie trajektorii w otwartej przestrzeni w pierwszej kolejności wymaga określenia zadowalającego sposobu ułożenia siatki, po której poruszać się będzie statek. Systemy pozycjonowania (takie jak GPS) dostarczają dane w układzie absolutnym (geodezyjnym/sferycznym), które najczęściej muszą być przez algorytmy robotyczne przeliczone na układy lokalne (płaskie/kartezjańskie). 
+
+Rozważania przedstawione w tej sekcji, opisujące naturę systemów odniesienia oraz matematyczne ramy przejścia z elipsoidy na płaszczyznę, opierają się m.in. na opracowaniu J. Lamparskiego\footnote{Lamparski J., \textit{Układy współrzędnych stosowane w Polsce i ich relacje względem globalnego układu WGS84}, NAVI sp. z o.o., 1998. Dostęp online: \href{https://www.navi.pl/katalog/0/113/uklady_wspolrzednych.html}{navi.pl}}.
+
+% -------------------------------------------------------
+
+\subsection{Układy przestrzenne: Od kuli do elipsoidy (WGS84)}
+
+Aby precyzyjnie kontrolować drona, musimy najpierw zrozumieć, w jaki sposób opisujemy pozycję na Ziemi. Ewolucja systemów nawigacyjnych przebiegała od uproszczonych modeli idealnej kuli aż po precyzyjne elipsoidy obrotowe.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.55\textwidth]{figures/uw_1.png}
+    \caption{Układ współrzędnych geograficznych na wyidealizowanej kuli.}
+    \label{fig:geo_uklad}
+\end{figure}
+\subsubsection{Model idealnej kuli}
+Jak zilustrowano na Rysunku \ref{fig:geo_uklad}, najprostszą formą opisu położenia dowolnego obiektu jest \textbf{układ współrzędnych geograficznych}. Model ten zakłada, że Ziemia jest idealną kulą. Położenie wyznacza się w nim za pomocą dwóch kątów określających geocentryczny kierunek względem przyjętych osi. Znajdujące się na rysunku zmienne oznaczają:
+\begin{itemize}
+    \item \textbf{$O$ (Środek kuli):} Geometryczny środek sfery, stanowiący początek układu współrzędnych.
+    \item \textbf{$B$ oraz $B_1$ (Bieguny):} Punkty przecięcia osi obrotu Ziemi z powierzchnią sfery. Symbol $B$ oznacza \textbf{Biegun Północny}, natomiast $B_1$ oznacza \textbf{Biegun Południowy}. Prosta przechodząca przez punkty $B-O-B_1$ definiuje oś obrotu kuli ziemskiej.
+    \item \textbf{$R$ oraz $R_1$ (Płaszczyzna Równika):} Punkty skrajne wyznaczające na rzucie płaszczyznę równika ziemskiego (koła wielkiego prostopadłego do osi obrotu $B-B_1$). Płaszczyzna ta dzieli kulę na półkulę północną (z biegunem $B$) i południową (z biegunem $B_1$).
+    \item \textbf{Południk początkowy:} Półokrąg wielki łączący bieguny $B$ i $B_1$, przyjęty umownie jako odniesienie zerowe (odpowiednik południka Greenwich), od którego mierzony jest kąt długości geograficznej.
+    \item \textbf{$P$ (Punkt przestrzenny):} Dowolny analizowany punkt (obiekt, dron, stacja pomiarowa) zlokalizowany na powierzchni kuli.
+    \item \textbf{$-R-$ (Promień):} Odcinek łączący środek kuli $O$ z punktem $P$, reprezentujący promień sfery (wektor wodzący punktu).
+    \item \textbf{$\varphi$ (Szerokość geograficzna):} Kąt pionowy mierzony w płaszczyźnie południka punktu $P$, zawarty pomiędzy płaszczyzną równika ($R-R_1$) a promieniem wodzącym $OP$. Strzałka ze znakiem \textbf{„$+$”} wskazuje kierunek dodatni (na północ, od $0^\circ$ do $+90^\circ$ w punkcie $B$).
+    \item \textbf{$\lambda$ (Długość geograficzna):} Kąt poziomy (dwuścienny) mierzony w płaszczyźnie równika, zawarty pomiędzy południkiem początkowym a południkiem przechodzącym przez punkt $P$. Strzałka ze znakiem \textbf{„$+$”} wskazuje kierunek dodatni (na wschód, od $0^\circ$ do $+180^\circ$).
+    \item \textbf{$\delta$ (Odległość biegunowa / Kąt biegunowy):} Kąt zawarty między osią obrotu sfery (kierunkiem ku biegunowi północnemu $B$) a promieniem wodzącym $OP$. W geodezji i astronomii wielkość ta nazywana jest \textit{odległością biegunową} (ang. \textit{polar distance} lub \textit{colatitude}). Stanowi ona dopełnienie szerokości geograficznej do kąta prostego:
+    \begin{equation*}
+        \delta = 90^\circ - \varphi
+    \end{equation*}
+\end{itemize}
+\subsubsection{Model elipsoidy}
+Model idealnej kuli sprawdzał się w dawnej nawigacji morskiej. Jednak wraz z rozwojem inżynierii oraz systemów nawigacji satelitarnej (takich jak GPS), dokładność rzędu dziesiątek metrów okazała się niewystarczająca. Ze względu na działanie sił odśrodkowych wynikających z ruchu wirowego, Ziemia jest spłaszczona na biegunach i rozszerzona na równiku. Wymusiło to przejście na \textbf{układ współrzędnych elipsoidalnych}.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.55\textwidth]{figures/uw_2.png}
+    \caption{Układ współrzędnych elipsoidalnych w rzucie przestrzennym.}
+    \label{fig:elip_uklad}
+\end{figure}
+
+Jak przedstawia Rysunek \ref{fig:elip_uklad}, powierzchnią odniesienia matematycznego nie jest już kula, lecz elipsoida obrotowa. Ta zmiana geometrii wprowadza do obliczeń nowe wartości i definicje:
+\begin{itemize}
+    \item \textbf{$O$ (Środek układu):} Geometryczny środek elipsoidy obrotowej, stanowiący początek kartezjańskiego układu współrzędnych $(0,0,0)$ (w modelach globalnych, takich jak WGS84, pokrywa się ze środkiem masy Ziemi).
+    \item \textbf{$x, y, z$ (Osie kartezjańskie):} Prawoskrętny układ osi przestrzennych. Oś $z$ stanowi oś obrotu elipsoidy, oś $x$ leży w płaszczyźnie południka zerowego i równika, a oś $y$ dopełnia układ w płaszczyźnie równika pod kątem $90^\circ$. Pogrubione linie przerywane wskazują rzut współrzędnych kartezjańskich $(x, y, z)$ punktu $P$.
+    \item \textbf{$N$ oraz $S$ (Bieguny):} Punkty przecięcia osi obrotu $z$ z powierzchnią elipsoidy. Oznaczają odpowiednio \textbf{Biegun Północny} (\textit{North}) oraz \textbf{Biegun Południowy} (\textit{South}).
+    \item \textbf{$\omega$ (Prędkość kątowa):} Wektor prędkości kątowej określający ruch wirowy Ziemi (obrót elipsoidy wokół osi biegunowej $z$).
+    \item \textbf{$a$ oraz $b$ (Półosie elipsoidy):} Podstawowe parametry geometryczne elipsoidy obrotowej:
+    \begin{itemize}
+        \item $a$ -- \textbf{duża półoś} (promień równikowy, mierzony w płaszczyźnie $xy$),
+        \item $b$ -- \textbf{mała półoś} (promień biegunowy, mierzony wzdłuż osi obrotu $z$ od środka $O$ do bieguna $N$).
+    \end{itemize}
+    \item \textbf{$P$ (Punkt na elipsoidzie):} Analizowany punkt położony bezpośrednio na powierzchni elipsoidy odniesienia (z tego powodu wysokość elipsoidalna $H$ na tej rycinie nie występuje, gdyż wynosi $H=0$).
+    \item \textbf{$\mathbf{n}$ (Wektor normalny):} Jednostkowy wektor prostopadły do powierzchni stycznej do elipsoidy w punkcie $P$. Linia przechodząca przez ten wektor to \textbf{normalna elipsoidy w punkcie $P$}.
+    \item \textbf{$B = B_0$ (Równik):} Płaszczyzna równika elipsoidy (równoleżnik zerowy o szerokości geodezyjnej $B_0 = 0^\circ$).
+    \item \textbf{$B = B_p$ oraz $B_p$ (Szerokość geodezyjna):} Krzywa $B=B_p$ to równoleżnik przechodzący przez punkt $P$. Kąt $B_p$ to \textbf{szerokość geodezyjna} punktu $P$, mierzona w płaszczyźnie południka między płaszczyzną równika a kierunkiem normalnej elipsoidy.
+    \item \textbf{$L = L_0$ (Południk początkowy / zerowy):} Płaszczyzna południka odniesienia (dla którego długość geodezyjna wynosi $L_0 = 0^\circ$).
+    \item \textbf{$L = L_p$ oraz $L_p$ (Długość geodezyjna):} Krzywa $L=L_p$ to południk przechodzący przez punkt $P$ i łączący bieguny $N$ i $S$. Kąt $L_p$ to \textbf{długość geodezyjna} punktu $P$, mierzona w płaszczyźnie równika od południka zerowego do południka punktu $P$.
+    \item \textbf{$p$ (Odległość biegunowa / Colatitude):} Kąt zawarty pomiędzy osią obrotu elipsoidy (kierunkiem bieguna północnego $N$) a kierunkiem wyznaczonym przez punkt $P$. Podobnie jak na sferze, kąt ten jest dopełnieniem szerokości geodezyjnej do kąta prostego:
+    \begin{equation*}
+        p = 90^\circ - B_p
+    \end{equation*}
+\end{itemize}
+\subsubsection{Model WGS84}
+Drony i współczesne systemy GNSS bazują powszechnie na światowym standardzie odniesienia \textbf{WGS84} (\textit{World Geodetic System 1984}). Standard ten to nic innego, jak globalnie ujednolicona elipsoida, która przyjmuje dłuższą półoś na poziomie dokładnie $a = 6\,378\,137$ m. Współrzędne można wyrażać w niej kątowo (geodezyjnie: $B, L, H$), ale do obliczeń wektorowych drony korzystają z jej rzutu kartezjańskiego.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.55\textwidth]{figures/uw_3.png}
+    \caption{Geocentryczny układ współrzędnych ortokartezjańskich WGS84.}
+    \label{fig:wgs84_uklad}
+\end{figure}
+
+Rysunek \ref{fig:wgs84_uklad} przedstawia trójwymiarowy układ kartezjański wpisany w elipsoidę systemu WGS84. Parametry osi zdefiniowane są w sposób uniwersalny dla całego globu:
+\begin{itemize}
+    \item \textbf{Centrum środka mas Ziemi $(0,0,0)$:} 
+    Początek układu współrzędnych ortokartezjańskich (zaznaczony czarnym punktem w centrum elipsoidy). Pokrywa się on ściśle z fizycznym środkiem masy całej Ziemi (wliczając w to masę oceanów oraz atmosfery). Dzięki temu układ WGS84 jest układem \textbf{geocentrycznym}, co umożliwia precyzyjny opis orbit satelitów systemu GPS na bazie praw grawitacji Newtona.
+
+    \item \textbf{Oś $Z_{\text{WGS84}}$ oraz CTP (\textit{Conventional Terrestrial Pole}):} 
+    Pionowa oś układu, skierowana wzdłuż osi obrotu Ziemi w stronę bieguna północnego. Zgodnie z etykietą na rysunku, jej kierunek definiowany jest przez umowny biegun ziemski \textbf{CTP (1984)} (\textit{Conventional Terrestrial Pole}). Jest to uśredniony w czasie (dla epoki 1984.0) biegun obrotu wyznaczony przez międzynarodowe służby geodezyjne, co eliminuje wpływ zjawiska tzw. wędrówki bieguna (ruchu precesyjno-nutacyjnego i okresowych drgań osi Ziemi).
+
+    \item \textbf{Oś $X_{\text{WGS84}}$ oraz Południk zerowy BIH (1984):} 
+    Pozioma oś leżąca w płaszczyźnie równika. Jej kierunek wyznacza prosta przecięcia płaszczyzny równika z płaszczyzną \textbf{południka zerowego zdefiniowanego przez BIH} (\textit{Bureau International de l'Heure}) w epoce 1984.0 (obecnie jest to tzw. południk odniesienia IERS -- \textit{IERS Reference Meridian}). Warto odnotować, że południk ten przebiega około $102$ metry na wschód od historycznego, astronomicznego południka Greenwich. Wzdłuż tej osi długość geodezyjna wynosi $L = 0^\circ$, a szerokość $B = 0^\circ$.
+
+    \item \textbf{Oś $Y_{\text{WGS84}}$:} 
+    Oś leżąca w płaszczyźnie równika, prostopadła do osi $X_{\text{WGS84}}$ i $Z_{\text{WGS84}}$. Została skierowana w stronę długości geograficznej $90^\circ\text{ E}$ (na wschód), uzupełniając trójkę wektorów bazowych tak, aby tworzyły one \textbf{prawoskrętny, trójwymiarowy ortogonalny (prostokątny) układ współrzędnych}.
+
+    \item \textbf{Siatka elipsoidy na rysunku (płaszczyzny bazowe):}
+    \begin{itemize}
+        \item \textbf{Płaszczyzna równika ($X_{\text{WGS84}} - Y_{\text{WGS84}}$):} Elipsa pozioma przechodząca przez środek układu reprezentuje równik elipsoidy WGS84, na którym szerokość geodezyjna wynosi $B = 0^\circ$.
+        \item \textbf{Łuk południka zerowego ($X_{\text{WGS84}} - Z_{\text{WGS84}}$):} Pionowy łuk łączący biegun $Z_{\text{WGS84}}$ z osią $X_{\text{WGS84}}$ reprezentuje południk początkowy ($L = 0^\circ$).
+        \item \textbf{Łuk południka $90^\circ\text{ E}$ ($Y_{\text{WGS84}} - Z_{\text{WGS84}}$):} Pionowy łuk prostopadły do południka zerowego, wyznaczający kierunek ćwiartkowy wschodni.
+    \end{itemize}
+\end{itemize}
+
+Przejście z układu elipsoidalnego ($B, L, H$) do pełnego układu kartezjańskiego 3D ($X, Y, Z$) wymaga użycia pierwszego mimośrodu elipsoidy ($e$). Relację tę (rzutowanie na układ geocentryczny) opisują analityczne wzory:
+
+\begin{align}
+    X &= (N + H) \cos B \cos L \\
+    Y &= (N + H) \cos B \sin L \\
+    Z &= [N(1 - e^2) + H] \sin B
+\end{align}
+
+gdzie wspomniany już wcześniej promień krzywizny $N$ dany jest wzorem:
+\begin{equation}
+    N = \frac{a}{\sqrt{1 - e^2 \sin^2 B}}
+\end{equation}
+
+Rozwiązanie problemu odwrotnego (wyznaczenie szerokości i długości ze współrzędnych kartezjańskich $X, Y, Z$) jest zagadnieniem znacznie bardziej złożonym i na drodze obliczeniowej wymaga implementacji algorytmów iteracyjnych, przybliżających wartość kąta $B$ aż do osiągnięcia ustalonego progu zbieżności.
+
+\subsection{Układy płaskie (Odwzorowania Kartograficzne)}
+Choć globalny system GPS zapewnia dokładność pozycjonowania 3D, z punktu widzenia projektowania map ortofotomap (fotogrametria z dronów) oraz matematycznego planowania trajektorii skanowania pól – znacznie wygodniej jest operować na standardowym układzie płaskim w metrach. W tym celu korzysta się z procedur zwanych odwzorowaniami kartograficznymi, które pozwalają „rozwinąć” trójwymiarową sferę na dwuwymiarowy arkusz $x, y$. 
+
+W geodezji najcenniejsze są odwzorowania wiernokątne (np. Gaussa-Krügera lub Merkatora), które choć zniekształcają (w minimalnym stopniu) długości, to nie zniekształcają w ogóle kątów na mapie, co jest kluczowe dla poprawności nawigacyjnej i obliczania azymutów. 
+
+\subsubsection{Układ NED}
+W kontekście programowania autonomicznych misji BSP, nie używamy skomplikowanych państwowych odwzorowań geodezyjnych na duże dystanse (jak polski system PUGK'65 czy PL-1992). Loty dronów trwają stosunkowo krótko i w małym promieniu operacyjnym. Dlatego zamiast odwzorowań walcowych wprowadzamy tzw. \textbf{Lokalny System Kartezjański}, potocznie określany w literaturze lotniczej mianem układu \textbf{NED} (\textit{North, East, Down}).
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[scale=1]{figures/ned_system.png}
+    \caption{Układ współrzędnych North-East-Down (NED).}
+    \label{fig:elip_uklad}
+\end{figure}
+Układ ten budowany jest „w locie” i opiera się na umieszczeniu płaszczyzny stycznej do kuli ziemskiej dokładnie w punkcie, w którym znajduje się baza operacyjna statku ($X=0, Y=0, Z=0$). Osie układu definiuje się następująco:
+\begin{itemize}
+    \item Oś $X$ (\textit{North}) skierowana jest idealnie wzdłuż lokalnego południka geograficznego na północ geograficzną.
+    \item Oś $Y$ (\textit{East}) skierowana jest wzdłuż lokalnego równoleżnika na wschód geograficzny.
+    \item Oś $Z$ (\textit{Down}) skierowana jest ortogonalnie w dół (w stronę środka masy Ziemi), domykając prawoskrętny układ współrzędnych. Wynika z tego, że ujemne wartości na osi Z będą oznaczać wzrost wysokości statku nad ziemią (pułap $H_{alt} = -Z_{ned}$).
+\end{itemize}
+
+% -------------------------------------------------------
+
+\subsection{Przykład praktyczny: Translacje za pomocą przybliżenia sferycznego}
+Przy założeniu relatywnie krótkich misji (poniżej $10$ km długości wektora), krzywiznę elipsoidy w procedurach inżynierskich drona można zminimalizować do promienia kuli $R = 6\,378\,137$ m, co pozwala zredukować skomplikowane przekształcenia tensorowe Gaussa do bardzo prostego układu trygonometrycznego.
+
+W niniejszym kursie algorytmika Pythona używa matematycznego wzoru do natychmiastowego przetłumaczenia zadanego przesunięcia w płaskim układzie kartezjańskim (np. "przesuń cel o $\Delta North$ oraz $\Delta East$ metrów") z powrotem na język globalnego modułu satelitarnego WGS84:
+
+\begin{lstlisting}[language=Python, caption=Przeliczanie przesunięcia metrycznego w układzie NED na współrzędne GPS (w oparciu o promień kuli)]
+def get_location_meters(original_location, d_north, d_east):
+    earth_radius = 6378137.0
+    
+    # Krok 1: Wyliczenie offsetu katowego (w radianach)
+    d_lat = d_north / earth_radius
+    
+    # Wspolrzedna East wymaga doliczenia funkcji 'cos', poniewaz obwody 
+    # rownoleznikow zawezaja sie wraz ze zblizaniem sie do biebunow Ziemi
+    d_lon = d_east / (earth_radius * math.cos(math.pi * original_location.lat / 180.0))
+    
+    # Krok 2: Zamiana radianow na stopnie dziesietne (decimal degrees)
+    new_lat = original_location.lat + (d_lat * 180.0 / math.pi)
+    new_lon = original_location.lon + (d_lon * 180.0 / math.pi)
+    
+    return LocationGlobalRelative(new_lat, new_lon, original_location.alt)
+\end{lstlisting}
+
+Podobne uproszczenia (przybliżenie Płaskiej Ziemi) stosujemy, obliczając najkrótszą odległość euklidesową (w metrach) pomiędzy dwoma punktami GPS. Znając z geometrii definicję miary Pitagorasa $\Delta d = \sqrt{\Delta x^2 + \Delta y^2}$, musimy jedynie odpowiednio wylistować długości łuków, korzystając ze stałego przelicznika $1^\circ \approx 111,319.5$ metrów. 
+\begin{lstlisting}[language=Python, caption=Wyznaczanie odległości euklidesowej z układu geodezyjnego]
+def get_distance_metres(loc1, loc2):
+    """
+    Krotki algorytm obliczania odleglosci euklidesowej w metrach. 
+    Wzor wykorzystuje stala zamiane stopni na metry.
+    """
+    d_lat = loc2.lat - loc1.lat
+    d_lon = loc2.lon - loc1.lon
+    return math.sqrt((d_lat**2) + (d_lon**2)) * 1.113195e5
+\end{lstlisting}
+Tak przedstawiona dualność opisu trajektorii pozwala algorytmice drona realizować misje na geometrycznie doskonałej, dwuwymiarowej tablicy kartezjańskiej (co wybitnie sprawdza się m.in. w implementacji algorytmów Sweep-Line i Kosiarki z modułu CPP), jednocześnie gwarantując wykonanie poprawnego, wolnego od dryfu satelitarnego toru przelotu w świecie rzeczywistym.
+\section{Krzywe parametryczne w modelowaniu trajektorii}
+Zarządzanie lotem za pomocą tzw. \textit{waypointów} (zbioru rozłącznych punktów docelowych) jest wystarczające dla misji logistycznych, jednak prowadzi do szarpanego, nieciągłego ruchu statku. Wyższą formą kontroli jest zdefiniowanie ścieżki jako ciągłej krzywej parametrycznej $P(t)$, opisanej zmienną $t \in [t_0, t_k]$. 
+
+\subsection{Krzywe w przestrzeni 2D}
+W płaszczyźnie poziomej (zakładając stałą wysokość) zbiór położeń można modelować za pomocą funkcji trygonometrycznych. Stanowią one bazę do zaawansowanych algorytmów optymalizujących łagodne zakręty drona.
+
+\textbf{Okrąg i Lemniskata Gerono (Ósemka):}
+Dla zadanego promienia (lub skali) $R$, pozycję na osiach $(X, Y)$ w funkcji czasu wyznaczamy analitycznie:
+\begin{align}
+    \text{Okrąg: } \quad x(t) &= R \cos(t), \quad y(t) = R \sin(t) \\
+    \text{Lemniskata: } \quad x(t) &= R \sin(t), \quad y(t) = R \sin(t)\cos(t)
+\end{align}
+
+W praktyce programistycznej krzywe te dyskretyzujemy na $N$ punktów (dla $t$ od $0$ do $2\pi$), aby wygenerować gładką serię krótkich komend nawigacyjnych (patrz: \texttt{03\_parametric\_shapes.py}).
+
+\subsection{Krzywe w przestrzeni 3D}
+Wprowadzenie trzeciego wymiaru otwiera możliwości dla misji ratunkowych i fotogrametrycznych. Klasycznym przykładem jest helisa stożkowa, która w funkcji parametru ewoluującego ulega zmianie zarówno na płaszczyźnie poziomej (zmniejszający się promień), jak i pionowej (spadająca wysokość).
+
+Równanie takiej spirali poszukiwawczej, wykorzystywanej m.in. w skrypcie \texttt{07\_a\_spiral\_search.py}, przyjmuje postać:
+\begin{align*}
+    x(t) &= R(t) \cos(\omega t) \\
+    y(t) &= R(t) \sin(\omega t) \\
+    z(t) &= Z_{max} - k \cdot t
+\end{align*}
+gdzie $\omega$ definiuje częstotliwość obrotów, a $R(t)$ jest liniowo malejącą funkcją promienia względem $t$.
+
+% -------------------------------------------------------
+
+\section{Równania różniczkowe zwyczajne (ODE) w kinematyce}
+Zrozumienie działania kontrolerów lotu oraz metod wyznaczania punktów kolizyjnych (np. w naprowadzaniu predykcyjnym) wymaga odwołania się do podstaw rachunku różniczkowego. 
+
+\subsection{Sformułowanie problemu}
+Równaniem różniczkowym zwyczajnym nazywamy równanie wiążące poszukiwaną funkcję jednej zmiennej z jej pochodnymi. W fizyce klasycznej funkcją tą najczęściej jest wektor położenia w czasie $\vec{x}(t)$. Ze względu na drugą zasadę dynamiki Newtona ($F = ma$), układy mechaniczne modeluje się niemal wyłącznie równaniami rzędu pierwszego (gdzie zmienną jest prędkość $\vec{v} = \frac{d\vec{x}}{dt}$) oraz rzędu drugiego (przyspieszenie $\vec{a} = \frac{d^2\vec{x}}{dt^2}$).
+
+Do wyznaczenia jednoznacznego rozwiązania (konkretnej trajektorii lotu) konieczne jest zdefiniowanie tzw. \textbf{zagadnienia początkowego Cauchy’ego} – czyli podanie położenia i prędkości statku w chwili $t=0$:
+\begin{equation}
+    \begin{cases}
+        \frac{d\vec{x}}{dt} = f(t, \vec{x}(t)) \\
+        \vec{x}(t_0) = \vec{x}_0
+    \end{cases}
+\end{equation}
+
+Rozwiązanie analityczne jest możliwe dla prostych, zdeterminowanych modeli (jak balistyka pocisku). Jednak dron porusza się w dynamicznie zmieniającym się środowisku (losowe podmuchy wiatru, dynamiczne decyzje algorytmów roju), co sprawia, że funkcje sterujące zmieniają się w każdej klatce czasu. Z tego powodu fizyka w symulatorze i estymatory w kontrolerach lotu muszą opierać się na numerycznym całkowaniu tych równań.
+
+% -------------------------------------------------------
+
+\section{Numeryczne całkowanie równań ruchu}
+Ze względu na brak ciągłości czasu w układach mikroprocesorowych, pochodne zastępowane są ilorazami różnicowymi dla dyskretnego kroku czasowego $\Delta t$. Wybór metody całkowania jest zawsze kompromisem pomiędzy złożonością obliczeniową (obciążeniem procesora) a stabilnością (dokładnością fizyki).
+
+\subsection{Metoda Eulera (rzędu pierwszego)}
+Najprostszą formą rozwiązywania zagadnień początkowych jest jawna metoda Eulera. W każdym kroku pętli zakłada ona, że pochodna (np. prędkość) jest stała na przestrzeni interwału $\Delta t$:
+\begin{align}
+    \vec{v}_{n+1} &= \vec{v}_n + \vec{a}(\vec{x}_n, \vec{v}_n, t_n) \cdot \Delta t \\
+    \vec{x}_{n+1} &= \vec{x}_n + \vec{v}_n \cdot \Delta t
+\end{align}
+
+Wadą tej metody jest szybka akumulacja błędu globalnego (wynoszącego $\mathcal{O}(\Delta t)$), co w symulacji lotu prowadzi do powolnego "rozjeżdżania się" estymowanego położenia z rzeczywistością, jeśli krok $\Delta t$ jest zbyt duży. Jest ona jednak powszechnie stosowana w skryptach wysokiego poziomu (np. naszych algorytmach Cuckera-Smale'a) ze względu na łatwość implementacji oraz dominujący wpływ zewnętrznych układów stabilizujących (PID drona koryguje nasze błędy numeryczne).
+
+\subsection{Metoda Rungego-Kutty (rzędu czwartego - RK4)}
+Standardem w silnikach fizycznych symulatorów (takich jak wewnętrzny model SITL) są wielokrokowe metody wyższego rzędu, głównie algorytm RK4. Aby obliczyć nowe położenie, metoda RK4 probkuje pochodną funkcji w czterech punktach wewnątrz kroku $\Delta t$ (na początku, dwukrotnie w połowie i na końcu przedziału), po czym uśrednia te wektory z odpowiednimi wagami.
+Skutkuje to redukcją błędu rzędu $\mathcal{O}(\Delta t^4)$, co zapewnia niezbędną, absolutną stabilność numeryczną przy odtwarzaniu agresywnych manewrów aerodynamicznych drona, unikając jednoczesnego zjawiska numerycznej eksplozji układu.
