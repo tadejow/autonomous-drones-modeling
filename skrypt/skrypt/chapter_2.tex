@@ -173,33 +173,152 @@ def get_distance_metres(loc1, loc2):
     return math.sqrt((d_lat**2) + (d_lon**2)) * 1.113195e5
 \end{lstlisting}
 Tak przedstawiona dualność opisu trajektorii pozwala algorytmice drona realizować misje na geometrycznie doskonałej, dwuwymiarowej tablicy kartezjańskiej (co wybitnie sprawdza się m.in. w implementacji algorytmów Sweep-Line i Kosiarki z modułu CPP), jednocześnie gwarantując wykonanie poprawnego, wolnego od dryfu satelitarnego toru przelotu w świecie rzeczywistym.
+
+
+
+
 \section{Krzywe parametryczne w modelowaniu trajektorii}
-Zarządzanie lotem za pomocą tzw. \textit{waypointów} (zbioru rozłącznych punktów docelowych) jest wystarczające dla misji logistycznych, jednak prowadzi do szarpanego, nieciągłego ruchu statku. Wyższą formą kontroli jest zdefiniowanie ścieżki jako ciągłej krzywej parametrycznej $P(t)$, opisanej zmienną $t \in [t_0, t_k]$. 
+
+W klasycznym podejściu nawigacyjnym trajektorię lotu definiuje się jako uporządkowany ciąg punktów orientacyjnych (ang. \textit{waypoints}) $W = \{w_1, w_2, \dots, w_m\} \subset \mathbb{R}^3$, połączonych odcinkami prostoliniowymi. Choć metoda ta sprawdza się w misjach transportowych na dużych wysokościach, posiada fundamentalne wady w sterowaniu autonomicznym:
+\begin{itemize}
+    \item \textbf{Brak gładkości ($C^0$):} W węzłach $w_i$ wektor prędkości doznaje skokowej zmiany kierunku. Realizacja takiego ruchu przez układ fizyczny wymagałaby nieskończenie dużych sił (przyspieszeń), co w praktyce wymusza wyhamowanie statku niemal do zera przed każdym zakrętem.
+    \item \textbf{Nieoptymalne zużycie energii:} Ciągłe cykle hamowania i przyspieszania drastycznie skracają czas pracy akumulatorów LiPo.
+\end{itemize}
+
+Rozwiązaniem tego problemu jest modelowanie toru ruchu za pomocą \textbf{krzywych parametrycznych klasy co najmniej $C^2$} (dwukrotnie różniczkowalnych w sposób ciągły):
+\begin{equation}
+    \mathbf{r}(t) = \begin{bmatrix} x(t) \\ y(t) \\ z(t) \end{bmatrix}, \quad t \in [t_0, t_k]
+\end{equation}
+gdzie parametr $t$ utożsamiamy najczęściej z czasem fizycznym. Taki opis pozwala na bezpośrednie wyznaczenie wektora prędkości $\mathbf{v}(t) = \mathbf{\dot{r}}(t)$ oraz wektora przyspieszenia $\mathbf{a}(t) = \mathbf{\ddot{r}}(t)$, co umożliwia kontrolerom lotu płynne sterowanie ciągiem i kątami przechylenia statku.
+
 
 \subsection{Krzywe w przestrzeni 2D}
-W płaszczyźnie poziomej (zakładając stałą wysokość) zbiór położeń można modelować za pomocą funkcji trygonometrycznych. Stanowią one bazę do zaawansowanych algorytmów optymalizujących łagodne zakręty drona.
 
-\textbf{Okrąg i Lemniskata Gerono (Ósemka):}
-Dla zadanego promienia (lub skali) $R$, pozycję na osiach $(X, Y)$ w funkcji czasu wyznaczamy analitycznie:
+Rozważmy ruch w płaszczyźnie poziomej przy założeniu stałego pułapu ($z(t) = \text{const}$, $v_z = 0$). Niech $\mathbf{r}(t) = [x(t), y(t)]^T$ będzie krzywą płaską. 
+
+\subsubsection{Krzywizna a ograniczenia fizyczne}
+Kluczowym pojęciem analizy trajektorii jest jej \textbf{krzywizna} $\kappa(t)$, mierząca tempo zmiany kierunku wektora stycznego:
+\begin{equation}
+    \kappa(t) = \frac{|\dot{x}\ddot{y} - \dot{y}\ddot{x}|}{(\dot{x}^2 + \dot{y}^2)^{3/2}} = \frac{\|\mathbf{\dot{r}}(t) \times \mathbf{\ddot{r}}(t)\|}{\|\mathbf{\dot{r}}(t)\|^3}
+\end{equation}
+Z mechaniki newtonowskiej wynika, że ruch po krzywej o krzywiźnie $\kappa(t)$ z prędkością skalarną $v(t) = \|\mathbf{\dot{r}}(t)\|$ generuje przyspieszenie dośrodkowe:
+\begin{equation}
+    a_n(t) = v^2(t) \cdot \kappa(t)
+\end{equation}
+Ponieważ maksymalny kąt przechylenia drona (ang. \textit{tilt angle}) jest ograniczony parametrami konstrukcyjnymi i stabilnością aerodynamiczną, maksymalne dopuszczalne przyspieszenie boczne wynosi $a_{\max} = g \tan(\theta_{\max})$. Wprowadza to twarde ograniczenie na prędkość w zakręcie:
+\begin{equation}
+    v(t) \le \sqrt{\frac{a_{\max}}{\kappa(t)}}
+\end{equation}
+W punktach o dużej krzywiźnie $\kappa$ (ostre skręty) dron musi zredukować prędkość, natomiast na odcinkach o $\kappa \approx 0$ może poruszać się z prędkością maksymalną.
+
+\subsubsection{Przykłady krzywych analitycznych}
+
+W module \texttt{02\_fizyka\_i\_matematyka} (skrypt \texttt{03\_parametric\_shapes.py}) zaimplementowano trzy reprezentatywne geometrie:
+
+\paragraph{1. Okrąg (Krzywa o stałej krzywiźnie):}
+Najprostsza krzywa zamknięta o stałej krzywiźnie $\kappa = \frac{1}{R}$:
+\begin{equation}
+    \begin{cases}
+        x(t) = R \cos(\omega t) - R \\
+        y(t) = R \sin(\omega t)
+    \end{cases}, \quad t \in \left[0, \frac{2\pi}{\omega}\right]
+\end{equation}
+Przesunięcie o $-R$ na osi $x$ zostało zastosowane w celu zapewnienia warunku początkowego $\mathbf{r}(0) = [0, 0]^T$, dzięki czemu dron rozpoczyna manewr bezpośrednio z punktu zawisu. Prędkość i przyspieszenie wynoszą odpowiednio:
 \begin{align}
-    \text{Okrąg: } \quad x(t) &= R \cos(t), \quad y(t) = R \sin(t) \\
-    \text{Lemniskata: } \quad x(t) &= R \sin(t), \quad y(t) = R \sin(t)\cos(t)
+    \mathbf{v}(t) &= [-R\omega \sin(\omega t), R\omega \cos(\omega t)]^T, \quad \|\mathbf{v}(t)\| = R\omega = \text{const} \\
+    \mathbf{a}(t) &= [-R\omega^2 \cos(\omega t), -R\omega^2 \sin(\omega t)]^T, \quad \|\mathbf{a}(t)\| = R\omega^2 = \text{const}
 \end{align}
+Stałość modułu przyspieszenia oznacza, że dron utrzymuje stały kąt przechyłu (Roll) przez cały czas trwania manewru.
 
-W praktyce programistycznej krzywe te dyskretyzujemy na $N$ punktów (dla $t$ od $0$ do $2\pi$), aby wygenerować gładką serię krótkich komend nawigacyjnych (patrz: \texttt{03\_parametric\_shapes.py}).
+\paragraph{2. Lemniskata Gerono (Ósemka):}
+Krzywa w kształcie cyfry 8, stosowana powszechnie w procedurach kalibracji magnetometru (kompasu) BSP:
+\begin{equation}
+    \begin{cases}
+        x(t) = A \sin(\omega t) \\
+        y(t) = A \sin(\omega t)\cos(\omega t) = \frac{A}{2} \sin(2\omega t)
+    \end{cases}, \quad t \in \left[0, \frac{2\pi}{\omega}\right]
+\end{equation}
+Krzywizna lemniskaty zmienia znak przy przejściu przez punkt węzłowy $(0,0)$, co wymaga od kontrolera lotu płynnego przejścia z przechyłu w lewo do przechyłu w prawo (inwersja wektora siły dośrodkowej).
+
+\paragraph{3. Kardioida (Krzywa o zmiennej dynamice):}
+Krzywa o równaniu wykorzystującym sumę harmonicznych, generująca kształt serca:
+\begin{equation}
+    \begin{cases}
+        x(t) = 16A \sin^3(\omega t) \\
+        y(t) = A \big(13\cos(\omega t) - 5\cos(2\omega t) - 2\cos(3\omega t) - \cos(4\omega t)\big)
+    \end{cases}
+\end{equation}
+Trajektoria ta posiada ostrze (punkt osobliwy, w którym $\mathbf{\dot{r}}(t) \to 0$ przy zbliżaniu się do szpica), co stanowi doskonały poligon testowy dla algorytmów sprawdzających zachowanie pętli sterowania przy gwałtownych zmianach zwrotu wektora prędkości.
+
+\subsubsection{Dyskretyzacja i filtracja geometryczna w kodzie}
+Komputer pokładowy drona operuje w czasie dyskretnym z częstotliwością $f = \frac{1}{\Delta t}$. Ciągła krzywa $\mathbf{r}(t)$ jest próbkowana do postaci zbioru punktów węzłowych $\mathbf{P}_k = \mathbf{r}(k \Delta t)$ dla $k = 0, 1, \dots, N$. 
+
+W skrypcie \texttt{03\_parametric\_shapes.py} zaimplementowano \textbf{pętlę nadążną z tolerancją promienia akceptacji} $r_{\text{tol}}$:
+\begin{equation}
+    \|\mathbf{r}_{\text{drone}} - \mathbf{P}_k\| \le r_{\text{tol}} \implies k \leftarrow k + 1
+\end{equation}
+Ustawienie $r_{\text{tol}} \approx 2.0\text{ m}$ działa jak mechaniczny filtr dolnoprzepustowy. Autopilot przełącza cel na kolejny punkt zanim statek zbiegnie do punktu bieżącego. Wykorzystuje to bezwładność drona do naturalnego zaokrąglania krzywej, eliminując szarpnięcia bez konieczności obliczania złożonych wielomianów wyższych rzędów na pokładzie mikrokontrolera.
+
 
 \subsection{Krzywe w przestrzeni 3D}
-Wprowadzenie trzeciego wymiaru otwiera możliwości dla misji ratunkowych i fotogrametrycznych. Klasycznym przykładem jest helisa stożkowa, która w funkcji parametru ewoluującego ulega zmianie zarówno na płaszczyźnie poziomej (zmniejszający się promień), jak i pionowej (spadająca wysokość).
 
-Równanie takiej spirali poszukiwawczej, wykorzystywanej m.in. w skrypcie \texttt{07\_a\_spiral\_search.py}, przyjmuje postać:
-\begin{align*}
-    x(t) &= R(t) \cos(\omega t) \\
-    y(t) &= R(t) \sin(\omega t) \\
-    z(t) &= Z_{max} - k \cdot t
-\end{align*}
-gdzie $\omega$ definiuje częstotliwość obrotów, a $R(t)$ jest liniowo malejącą funkcją promienia względem $t$.
+W trójwymiarowej przestrzeni euklidesowej $\mathbb{R}^3$ trajektoria zyskuje dodatkowy stopień swobody: zmianę wysokości w czasie ($z(t)$). Z punktu widzenia geometrii różniczkowej, krzywą przestrzenną charakteryzują dwie wielkości lokalne: \textbf{krzywizna} $\kappa(t)$ oraz \textbf{skręcenie (torsja)} $\tau(t)$, opisujące zachowanie reperu Freneta-Serreta $(\mathbf{T}, \mathbf{N}, \mathbf{B})$:
+\begin{equation}
+    \frac{d\mathbf{T}}{ds} = \kappa \mathbf{N}, \quad 
+    \frac{d\mathbf{N}}{ds} = -\kappa \mathbf{T} + \tau \mathbf{B}, \quad 
+    \frac{d\mathbf{B}}{ds} = -\tau \mathbf{N}
+\end{equation}
+gdzie $s$ oznacza naturalny parametr długości łuku, $\mathbf{T}$ wektor styczny, $\mathbf{N}$ normalny, a $\mathbf{B} = \mathbf{T} \times \mathbf{N}$ binormalny. Torsja $\tau(t)$ określa tempo, z jakim krzywa "ucieka" z płaszczyzny ściśle stycznej.
 
-% -------------------------------------------------------
+\subsubsection{Helisa walcowa (Cylindrical Helix)}
+Najprostsza trójwymiarowa krzywa przestrzenna o stałej krzywiźnie i stałym skręceniu. Powstaje przez nałożenie jednostajnego ruchu postępowego wzdłuż osi $z$ na ruch po okręgu:
+\begin{equation}
+    \mathbf{r}(t) = \begin{bmatrix} R \cos(\omega t) \\ R \sin(\omega t) \\ v_z \cdot t \end{bmatrix}, \quad t \ge 0
+\end{equation}
+Własności różniczkowe helisy walcowej wyrażają się wzorami:
+\begin{equation}
+    \kappa = \frac{R}{R^2 + (v_z/\omega)^2} = \text{const}, \quad \tau = \frac{v_z/\omega}{R^2 + (v_z/\omega)^2} = \text{const}
+\end{equation}
+Krzywa ta jest podstawowym wzorcem wykorzystywanym przy inspekcjach obiektów pionowych o przekroju kołowym (kominy, wieże telekomunikacyjne, turbiny wiatrowe).
+
+\subsubsection{Helisa stożkowa (Conical Helix) -- Lejek poszukiwawczy}
+W misjach poszukiwawczo-ratowniczych (SAR -- \textit{Search and Rescue}) stosuje się trajektorię o zmiennym promieniu i malejącej wysokości. Dron rozpoczyna przeszukiwanie na wysokim pułapie, zataczając szerokie kręgi w celu wykrycia sygnału z nadajnika ratunkowego, a następnie zawęża promień w miarę obniżania lotu, koncentrując się na źródle sygnału.
+
+Równanie parametryczne helisy stożkowej ma postać:
+\begin{equation}
+    \begin{cases}
+        x(t) = R(t) \cos(\omega t) \\
+        y(t) = R(t) \sin(\omega t) \\
+        z(t) = Z_0 - v_z \cdot t
+    \end{cases}
+\end{equation}
+gdzie promień maleje liniowo wraz z upływem czasu:
+\begin{equation}
+    R(t) = R_0 \left(1 - \alpha \frac{t}{t_k}\right), \quad \alpha \in (0, 1)
+\end{equation}
+Kinematyka tego ruchu wymaga od sterownika jednoczesnej modulacji prędkości we wszystkich trzech osiach. Różniczkując wektor położenia po czasie otrzymujemy wektor prędkości zadanej:
+\begin{equation}
+    \mathbf{v}(t) = \mathbf{\dot{r}}(t) = \begin{bmatrix}
+        \dot{R}(t)\cos(\omega t) - R(t)\omega\sin(\omega t) \\
+        \dot{R}(t)\sin(\omega t) + R(t)\omega\cos(\omega t) \\
+        -v_z
+    \end{bmatrix}
+\end{equation}
+gdzie $\dot{R}(t) = -\frac{\alpha R_0}{t_k} = \text{const}$. 
+
+\subsubsection{Trajektorie na powierzchniach walcowych (Inspekcja 3D)}
+W zaawansowanych misjach fotogrametrycznych (patrz skrypt \texttt{07\_c\_cylinder\_scan.py}) trajektorię generuje się nie w przestrzeni swobodnej, lecz w oparciu o geometrię badanego obiektu. 
+
+Jeżeli środek obiektu znajduje się w punkcie geograficznym $\mathbf{P}_{\text{target}} = (\text{lat}_0, \text{lon}_0)$, a jego wysokość wynosi $H_{\text{bld}}$, wówczas trajektorię definiuje się we współrzędnych walcowych $(r, \theta, z)$ sprowadzonych do bazy NED:
+\begin{equation}
+    \mathbf{r}_{\text{NED}}(\theta, z) = \begin{bmatrix}
+        N_{\text{target}} + R_{\text{scan}} \cos(\theta) \\
+        E_{\text{target}} + R_{\text{scan}} \sin(\theta) \\
+        -z
+    \end{bmatrix}, \quad \theta \in [0, 2\pi], \; z \in [Z_{\min}, Z_{\max}]
+\end{equation}
+Skanowanie realizowane jest poprzez dyskretne warstwy wysokościowe $z_k \in \{h_1, h_2, \dots, h_m\}$ (orbity poziome na stałych wysokościach) lub w postaci pionowego meandra (ang. \textit{raster path}), w którym dron przemieszcza się naprzemiennie w górę i w dół, dokonując obrotu o stały kąt $\Delta\theta$ na szczycie i u podstawy cylindra. Zapewnia to stałą odległość kamery od elewacji, co jest warunkiem koniecznym do uzyskania stałej rozdzielczości terenowej zdjęć (GSD -- \textit{Ground Sample Distance}).
+
 
 \section{Równania różniczkowe zwyczajne (ODE) w kinematyce}
 Zrozumienie działania kontrolerów lotu oraz metod wyznaczania punktów kolizyjnych (np. w naprowadzaniu predykcyjnym) wymaga odwołania się do podstaw rachunku różniczkowego. 
@@ -218,6 +337,9 @@ Do wyznaczenia jednoznacznego rozwiązania (konkretnej trajektorii lotu) koniecz
 Rozwiązanie analityczne jest możliwe dla prostych, zdeterminowanych modeli (jak balistyka pocisku). Jednak dron porusza się w dynamicznie zmieniającym się środowisku (losowe podmuchy wiatru, dynamiczne decyzje algorytmów roju), co sprawia, że funkcje sterujące zmieniają się w każdej klatce czasu. Z tego powodu fizyka w symulatorze i estymatory w kontrolerach lotu muszą opierać się na numerycznym całkowaniu tych równań.
 
 % -------------------------------------------------------
+
+
+
 
 \section{Numeryczne całkowanie równań ruchu}
 Ze względu na brak ciągłości czasu w układach mikroprocesorowych, pochodne zastępowane są ilorazami różnicowymi dla dyskretnego kroku czasowego $\Delta t$. Wybór metody całkowania jest zawsze kompromisem pomiędzy złożonością obliczeniową (obciążeniem procesora) a stabilnością (dokładnością fizyki).
