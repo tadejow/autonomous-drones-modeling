@@ -413,17 +413,67 @@ Tak zdefiniowany system gwarantuje nie tylko samoczynne formowanie się klastró
 
 
 \section{Numeryczne całkowanie równań ruchu}
-Ze względu na brak ciągłości czasu w układach mikroprocesorowych, pochodne zastępowane są ilorazami różnicowymi dla dyskretnego kroku czasowego $\Delta t$. Wybór metody całkowania jest zawsze kompromisem pomiędzy złożonością obliczeniową (obciążeniem procesora) a stabilnością (dokładnością fizyki).
 
-\subsection{Metoda Eulera (rzędu pierwszego)}
-Najprostszą formą rozwiązywania zagadnień początkowych jest jawna metoda Eulera. W każdym kroku pętli zakłada ona, że pochodna (np. prędkość) jest stała na przestrzeni interwału $\Delta t$:
+Kontrolery lotu oraz środowiska symulacyjne pracują w czasie dyskretnym. Rozwiązanie analityczne układu nieliniowych równań $\mathbf{x}'' = f(\mathbf{x}, \mathbf{x}', t)$ jest niemożliwe. Z tego powodu krzywą trajektorii przybliża się numerycznie krok po kroku w ustalonych odstępach czasu $\Delta t$.
+
+W kinematyce drona zagadnienie drugiego rzędu standardowo sprowadza się do układu równań pierwszego rzędu, wprowadzając wektor stanu $\mathbf{y}(t) = [\mathbf{x}(t), \mathbf{v}(t)]^T \in \mathbb{R}^6$:
+\begin{equation}
+    \mathbf{y}'(t) = \frac{d}{dt} \begin{bmatrix} \mathbf{x} \\ \mathbf{v} \end{bmatrix} = \begin{bmatrix} \mathbf{v} \\ f(t, \mathbf{x}, \mathbf{v}) \end{bmatrix} = \mathbf{F}(t, \mathbf{y})
+\end{equation}
+Taki zapis uniwersalizuje dowolny problem początkowy. Wybór metody rozwiązywania jest zawsze kompromisem pomiędzy złożonością obliczeniową (czasem procesora) a stabilnością algorytmu (kumulowaniem się błędu).
+
+% -------------------------------------------------------
+
+\subsection{Jawna metoda Eulera (rzędu pierwszego)}
+Najprostszą metodą numeryczną, wynikającą bezpośrednio z odrzucenia nieliniowych wyrazów rozwinięcia funkcji w szereg Taylora ($\mathcal{O}(\Delta t^2)$), jest jawna metoda Eulera. Zakłada ona, że wartość pochodnej wektora stanu $\mathbf{y}'$ (prędkość i przyspieszenie) na początku przedziału $[t_n, t_{n+1}]$ pozostaje stała przez całą długość interwału czasowego $\Delta t$.
+
+Równanie iteracyjne przejścia z kroku $n$ do kroku $n+1$ ma postać:
+\begin{equation}
+    \mathbf{y}_{n+1} = \mathbf{y}_n + \Delta t \cdot \mathbf{F}(t_n, \mathbf{y}_n)
+\end{equation}
+co w jawnym zapisie kinematycznym przyjmuje formę:
 \begin{align}
-    \vec{v}_{n+1} &= \vec{v}_n + \vec{a}(\vec{x}_n, \vec{v}_n, t_n) \cdot \Delta t \\
-    \vec{x}_{n+1} &= \vec{x}_n + \vec{v}_n \cdot \Delta t
+    \mathbf{v}_{n+1} &= \mathbf{v}_n + \mathbf{a}(t_n, \mathbf{x}_n, \mathbf{v}_n) \cdot \Delta t \\
+    \mathbf{x}_{n+1} &= \mathbf{x}_n + \mathbf{v}_n \cdot \Delta t
 \end{align}
 
-Wadą tej metody jest szybka akumulacja błędu globalnego (wynoszącego $\mathcal{O}(\Delta t)$), co w symulacji lotu prowadzi do powolnego "rozjeżdżania się" estymowanego położenia z rzeczywistością, jeśli krok $\Delta t$ jest zbyt duży. Jest ona jednak powszechnie stosowana w skryptach wysokiego poziomu (np. naszych algorytmach Cuckera-Smale'a) ze względu na łatwość implementacji oraz dominujący wpływ zewnętrznych układów stabilizujących (PID drona koryguje nasze błędy numeryczne).
+Główną wadą tej metody jest jej asymetria i niski rząd zbieżności. Błąd globalny jest rzędu pierwszego $\mathcal{O}(\Delta t)$. W przypadku symulacji układów fizycznych (np. wahadła lub obrotów drona) prowadzi to do "pompowania" sztucznej energii do układu, skutkując spiralnym rozbiegnięciem się trajektorii. Metoda ta jest jednak z sukcesem stosowana w naszych skryptach wysokiego poziomu (np. dla modelu Cuckera-Smale'a), ponieważ zewnętrzna, sprzętowa pętla PID drona na bieżąco stabilizuje te odchylenia numeryczne.
 
-\subsection{Metoda Rungego-Kutty (rzędu czwartego - RK4)}
-Standardem w silnikach fizycznych symulatorów (takich jak wewnętrzny model SITL) są wielokrokowe metody wyższego rzędu, głównie algorytm RK4. Aby obliczyć nowe położenie, metoda RK4 probkuje pochodną funkcji w czterech punktach wewnątrz kroku $\Delta t$ (na początku, dwukrotnie w połowie i na końcu przedziału), po czym uśrednia te wektory z odpowiednimi wagami.
-Skutkuje to redukcją błędu rzędu $\mathcal{O}(\Delta t^4)$, co zapewnia niezbędną, absolutną stabilność numeryczną przy odtwarzaniu agresywnych manewrów aerodynamicznych drona, unikając jednoczesnego zjawiska numerycznej eksplozji układu.
+% -------------------------------------------------------
+
+\subsection{Metoda Rungego-Kutty (rzędu czwartego -- RK4)}
+Standardem w silnikach fizycznych symulatorów (takich jak aerodynamiczny rdzeń ArduPilot SITL) jest metoda \textbf{RK4}. Mimo większego kosztu obliczeniowego, gwarantuje ona redukcję błędu globalnego do rzędu czwartego $\mathcal{O}(\Delta t^4)$, co zapobiega zjawisku tzw. eksplozji numerycznej, utrzymując stabilność układu przy relatywnie dużych krokach $\Delta t$.
+
+Filozofia algorytmu polega na porzuceniu założenia, że pochodna na początku przedziału jest dobrym przybliżeniem dla całej krzywej. Metoda RK4 próbkuje nachylenie stycznej (wektor $\mathbf{F}$) \textbf{w czterech strategicznych punktach} przedziału $[t_n, t_n + \Delta t]$, a nowe ułożenie punktu określa na podstawie ich średniej ważonej.
+
+\subsubsection{Algorytm metody RK4}
+Dla zadanego stanu $\mathbf{y}_n$ w chwili $t_n$, wyznaczamy nową pozycję wektora $\mathbf{y}_{n+1}$ w następujących krokach:
+
+\begin{enumerate}
+    \item \textbf{Próbkowanie na początku ($k_1$):} Obliczamy lokalną pochodną (styczną) bazując na aktualnym, startowym wektorze stanu:
+    \begin{equation}
+        \mathbf{k}_1 = \mathbf{F}(t_n, \mathbf{y}_n)
+    \end{equation}
+    
+    \item \textbf{Pierwsze próbkowanie w połowie ($k_2$):} Wykorzystując $k_1$, próbnie przesuwamy wektor stanu o pół kroku czasowego w przód ($\frac{\Delta t}{2}$). Wyliczamy pochodną w tym wirtualnym punkcie środkowym:
+    \begin{equation}
+        \mathbf{k}_2 = \mathbf{F}\left(t_n + \frac{\Delta t}{2}, \mathbf{y}_n + \frac{\Delta t}{2}\mathbf{k}_1\right)
+    \end{equation}
+    
+    \item \textbf{Drugie próbkowanie w połowie ($k_3$):} Opierając się na udoskonalonym przybliżeniu ze środka przedziału ($k_2$), ponownie wyliczamy pochodną w punkcie $t_n + \frac{\Delta t}{2}$. To krok korygujący:
+    \begin{equation}
+        \mathbf{k}_3 = \mathbf{F}\left(t_n + \frac{\Delta t}{2}, \mathbf{y}_n + \frac{\Delta t}{2}\mathbf{k}_2\right)
+    \end{equation}
+    
+    \item \textbf{Próbkowanie na końcu ($k_4$):} Używamy wektora $k_3$, aby dotrzeć aż do końca przedziału $t_n + \Delta t$ i zbadania tam nachylenia trajektorii:
+    \begin{equation}
+        \mathbf{k}_4 = \mathbf{F}(t_n + \Delta t, \mathbf{y}_n + \Delta t \mathbf{k}_3)
+    \end{equation}
+\end{enumerate}
+
+Po wyznaczeniu wszystkich czterech wektorów kierunkowych $\mathbf{k}_i$, dokonujemy ostatecznego, wysoce precyzyjnego uśrednienia. Współczynnikom pochodzącym ze środka przedziału (gdzie krzywizna funkcji jest zazwyczaj lepiej reprezentowana) nadaje się dwukrotnie większą wagę:
+\begin{equation}
+    \mathbf{y}_{n+1} = \mathbf{y}_n + \frac{\Delta t}{6} \left( \mathbf{k}_1 + 2\mathbf{k}_2 + 2\mathbf{k}_3 + \mathbf{k}_4 \right)
+\end{equation}
+
+Z programistycznego punktu widzenia, zaimplementowanie metody RK4 sprowadza się do wywołania funkcji dynamiki układu $\mathbf{F}(t, \mathbf{y})$ czterokrotnie na każdą klatkę fizyki. Złożoność algorytmu jest czterokrotnie większa niż dla metody Eulera, lecz uzyskany radykalny spadek błędu pozwala na znaczne wydłużenie kroku $\Delta t$, co rekompensuje nadmiarowość procesów ALU (jednostek arytmetyczno-logicznych) procesora pokładowego.
