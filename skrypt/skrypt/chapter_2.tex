@@ -321,24 +321,95 @@ Skanowanie realizowane jest poprzez dyskretne warstwy wysokościowe $z_k \in \{h
 
 
 \section{Równania różniczkowe zwyczajne (ODE) w kinematyce}
-Zrozumienie działania kontrolerów lotu oraz metod wyznaczania punktów kolizyjnych (np. w naprowadzaniu predykcyjnym) wymaga odwołania się do podstaw rachunku różniczkowego. 
 
-\subsection{Sformułowanie problemu}
-Równaniem różniczkowym zwyczajnym nazywamy równanie wiążące poszukiwaną funkcję jednej zmiennej z jej pochodnymi. W fizyce klasycznej funkcją tą najczęściej jest wektor położenia w czasie $\vec{x}(t)$. Ze względu na drugą zasadę dynamiki Newtona ($F = ma$), układy mechaniczne modeluje się niemal wyłącznie równaniami rzędu pierwszego (gdzie zmienną jest prędkość $\vec{v} = \frac{d\vec{x}}{dt}$) oraz rzędu drugiego (przyspieszenie $\vec{a} = \frac{d^2\vec{x}}{dt^2}$).
+Zrozumienie działania algorytmów nawigacyjnych, kontrolerów lotu oraz metod synchronizacji systemów wieloagentowych (np. lotu w roju) wymaga odwołania się do podstaw rachunku różniczkowego. W fizyce klasycznej i robotyce stan obiektu opisuje się wektorem jego położeń $\mathbf{x}(t) \in \mathbb{R}^d$ oraz prędkości $\mathbf{v}(t) = \mathbf{x}'(t) \in \mathbb{R}^d$. Ze względu na drugą zasadę dynamiki Newtona ($F = ma$), układy mechaniczne modeluje się najczęściej za pomocą równań różniczkowych zwyczajnych drugiego rzędu (wiążących przyspieszenie $\mathbf{x}''(t)$ ze stanem układu).
 
-Do wyznaczenia jednoznacznego rozwiązania (konkretnej trajektorii lotu) konieczne jest zdefiniowanie tzw. \textbf{zagadnienia początkowego Cauchy’ego} – czyli podanie położenia i prędkości statku w chwili $t=0$:
+\subsection{Zagadnienie początkowe Cauchy'ego dla układów autonomicznych}
+
+W analizie ruchu dronów najczęściej rozważamy modele niezależne bezpośrednio od upływu czasu (tzw. układy autonomiczne), gdzie ewolucja zależy wyłącznie od bieżącego położenia i prędkości w przestrzeni. Równanie ruchu zapisujemy w ogólnej postaci:
+\begin{equation}
+    \mathbf{x}'' = f(\mathbf{x}, \mathbf{x}')
+\end{equation}
+Aby z równania różniczkowego móc wyznaczyć jedną, konkretną trajektorię fizyczną spośród nieskończonej rodziny rozwiązań, konieczne jest sformułowanie tzw. \textbf{zagadnienia początkowego Cauchy'ego}. Polega ono na podaniu warunków początkowych, czyli stanu wektora w wybranej chwili $t_0 = 0$:
 \begin{equation}
     \begin{cases}
-        \frac{d\vec{x}}{dt} = f(t, \vec{x}(t)) \\
-        \vec{x}(t_0) = \vec{x}_0
+        \mathbf{x}'' = f(\mathbf{x}, \mathbf{x}') \\
+        \mathbf{x}(0) = \mathbf{x}_0 \\
+        \mathbf{x}'(0) = \mathbf{v}_0
+    \end{cases}
+    \label{eq:cauchy_ivp}
+\end{equation}
+Równanie to jest rozwiązywane w locie (przez sprzętowy kontroler lotu) – dla zadanego stanu $(x_0, v_0)$ komputer oblicza przyspieszenie i całkuje je w przód, by określić stan drona ułamek sekundy później.
+
+\subsubsection{Wpływ składników funkcji wymuszającej $f(\mathbf{x}, \mathbf{x}')$}
+Zależność funkcji przyspieszenia od poszczególnych pochodnych warunkuje charakter dynamiki układu:
+\begin{itemize}
+    \item \textbf{Brak zależności od $\mathbf{x}'$ ($f = f(\mathbf{x})$):} Układ jest \textit{zachowawczy}. Siła zależy wyłącznie od geometrii otoczenia. Klasycznym przykładem jest pole grawitacyjne ($\mathbf{x}'' = \mathbf{g}$) lub nieliniowy oscylator harmoniczny (np. wahadło bez oporów: $x'' = -\sin x$). Energia mechaniczna takiego systemu jest stała. Brak zależności od prędkości oznacza, że dron sterowany takim algorytmem nigdy nie wyhamuje – będzie oscylował w nieskończoność wokół punktu docelowego.
+    \item \textbf{Zależność od $\mathbf{x}'$ ($f = f(\mathbf{x}, \mathbf{x}')$):} Wprowadza do układu dyssypację (rozpraszanie energii) lub aktywne napędzanie. Składniki ujemnie proporcjonalne do prędkości (np. $-c \mathbf{x}'$) modelują siły oporu aerodynamicznego drona. Z punktu widzenia automatyki (regulatorów PD), wprowadzenie zależności od pochodnej błędu pozwala na wytłumienie oscylacji i stabilne zatrzymanie drona w punkcie docelowym. W algorytmach roju to właśnie zależność od $\mathbf{x}'$ sąsiada decyduje o synchronizacji (zrównaniu prędkości).
+\end{itemize}
+
+
+\subsection{Zagadnienia brzegowe w optymalizacji trajektorii}
+
+W opozycji do zagadnienia początkowego (gdzie znamy "Start" i prognozujemy przyszłość), w problemach planowania autonomicznych misji (np. precyzyjnego omijania przeszkód przy dojeściu do celu) znacznie częściej formułuje się \textbf{zagadnienie brzegowe} (ang. \textit{Boundary Value Problem -- BVP}).
+
+W układzie drugiego rzędu przyjmuje ono postać:
+\begin{equation}
+    \begin{cases}
+        F(\mathbf{x}, \mathbf{x}', \mathbf{x}'') = 0 \\
+        B_1(\mathbf{x}(t_0), \mathbf{x}'(t_0)) = \alpha \\
+        B_2(\mathbf{x}(t_k), \mathbf{x}'(t_k)) = \beta
     \end{cases}
 \end{equation}
-
-Rozwiązanie analityczne jest możliwe dla prostych, zdeterminowanych modeli (jak balistyka pocisku). Jednak dron porusza się w dynamicznie zmieniającym się środowisku (losowe podmuchy wiatru, dynamiczne decyzje algorytmów roju), co sprawia, że funkcje sterujące zmieniają się w każdej klatce czasu. Z tego powodu fizyka w symulatorze i estymatory w kontrolerach lotu muszą opierać się na numerycznym całkowaniu tych równań.
-
-% -------------------------------------------------------
+Oznacza to, że znamy stan w chwili początkowej $t_0$ (np. start z bazy) oraz pożądany stan w zadanej chwili końcowej $t_k$ (np. dron musi dotrzeć do strefy zrzutu ze zredukowaną prędkością). Poszukujemy takiej trajektorii $\mathbf{x}(t)$, która przejdzie przez te konkretne dwa stany graniczne, minimalizując często dodatkowy funkcjonał kosztu (np. najmniejsze zużycie energii $\int (\mathbf{x}'')^2 dt$). Rozwiązanie analityczne zagadnień brzegowych jest zazwyczaj niemożliwe, dlatego wykorzystuje się zaawansowane algorytmy numeryczne (tzw. \textit{Shooting Methods} lub \textit{Collocation Methods}).
 
 
+\subsection{Zastosowanie na przykładzie: Model Cuckera-Smale'a}
+
+Doskonałym przykładem pokazującym jak abstrakcyjne równania różniczkowe kontrolują rzeczywistą, fizyczną chmarę statków powietrznych, jest \textbf{model Cuckera-Smale’a (C-S)}\footnote{Cucker, F., Smale, S., \textit{Emergent Behavior in Flocks}, IEEE Transactions on Automatic Control, 2007.}. Jest to nieliniowy układ równań różniczkowych zwyczajnych drugiego rzędu, opisujący zjawisko tzw. \textit{flockingu} (gromadnego lotu, np. klucza ptaków).
+
+Niech $N$ oznacza liczbę dronów w roju. Dla $i$-tego drona jego pozycja to $\mathbf{x}_i \in \mathbb{R}^3$, a prędkość to $\mathbf{v}_i = \mathbf{x}'_i$. Klasyczny układ równań C-S (dla $i=1,\dots,N$) ma postać:
+\begin{equation}
+    \begin{cases}
+        \mathbf{x}'_i = \mathbf{v}_i \\
+        \mathbf{v}'_i = \frac{K}{N} \sum_{j=1}^{N} \psi(\|\mathbf{x}_j - \mathbf{x}_i\|) \cdot (\mathbf{v}_j - \mathbf{v}_i)
+    \end{cases}
+    \label{eq:cs_original}
+\end{equation}
+gdzie funkcja wagi $\psi(r)$ (tzw. potencjał oddziaływania) określa jak bardzo dystans osłabia chęć synchronizacji:
+\begin{equation}
+    \psi(r) = \frac{1}{(1 + r^2)^\beta}, \quad \beta \ge 0
+\end{equation}
+
+\subsubsection{Analiza matematyczna i zbieżność}
+Równanie \eqref{eq:cs_original} oznacza, że przyspieszenie ($\mathbf{v}'_i$) drona opiera się wyłącznie na \textbf{różnicy prędkości} między nim a sąsiadami ($\mathbf{v}_j - \mathbf{v}_i$). 
+Fundamentalne twierdzenie Cuckera i Smale'a dowodzi asymtotycznego powstania konsensusu (zjawiska \textit{flockingu}): Jeśli $\beta < \frac{1}{2}$, to dla dowolnych warunków początkowych (niezależnie jak drony są na starcie rozproszone), w granicy $t \to \infty$ prędkości wszystkich dronów zbiegają się do wspólnego wektora prędkości średniej $\bar{\mathbf{v}}$, a dystans między każdą parą zbiega do stałej wartości. Rój leci w idealnym szyku.
+
+\subsubsection{Modyfikacje hybrydowe do zastosowań inżynierskich}
+W implementacji informatycznej (skrypt \texttt{05\_a\_cucker\_smale\_model.py}) czysty system ODE został rozbudowany o dwa krytyczne człony nieliniowe (dodatkowe funkcje wymuszające), aby sprostać wymaganiom bezpieczeństwa przestrzeni powietrznej:
+
+\begin{enumerate}
+    \item \textbf{Potencjał Repulsyjny (Antykolizja):} 
+    Oryginalny system \eqref{eq:cs_original} nie zabrania pokrycia się dwóch obiektów w punkcie ($\mathbf{x}_i = \mathbf{x}_j$). Wprowadzono siłę odpychającą działającą na zasadzie odwrotnych sześcianów, która aktywuje się tylko w strefie niebezpiecznej ($r < D_{\text{safe}}$):
+    \begin{equation}
+        \mathbf{F}_{\text{rep}, i} = R \sum_{j \ne i, \|\mathbf{x}_{ij}\| < D_{\text{safe}}} \frac{\mathbf{x}_i - \mathbf{x}_j}{\|\mathbf{x}_i - \mathbf{x}_j\|^3}
+    \end{equation}
+    gdzie $R$ to stała siły odpychania. Zależność od samego położenia ($\mathbf{x}$) działa tu jak sztywna, nieliniowa sprężyna mechaniczna.
+    
+    \item \textbf{Zależność Leader-Follower (Kohezja kierunkowa):}
+    W systemach z podziałem decyzyjnym wyznacza się jednego agenta (Lidera, $i=0$), którego dynamika jest niezależna od układu (np. realizuje zewnętrzną misję zagadnienia brzegowego). Pozostałe drony $i \in \{1,\dots,N-1\}$ zostają poddane dodatkowemu przyciąganiu do Lidera na wzór oscylatora tłumionego (gdzie rolę tłumienia pełni mechanizm Cuckera-Smale'a):
+    \begin{equation}
+        \mathbf{F}_{\text{coh}, i} = K_{\text{coh}} (\mathbf{x}_0 - \mathbf{x}_i)
+    \end{equation}
+\end{enumerate}
+
+Ostateczny kształt hybrydowego równania różniczkowego ruchu dyskretnie całkowanego przez nasz skrypt na pokładzie roju przyjmuje postać silnie nieliniowego równania 2-go rzędu:
+\begin{equation}
+    \mathbf{v}'_i = \underbrace{ K_{\text{cs}} \sum_{j} \frac{\mathbf{v}_j - \mathbf{v}_i}{(1 + \|\mathbf{x}_{ij}\|^2)^\beta} }_{\text{Synchronizacja (C-S)}} 
+    + \underbrace{ R \sum_{j} \frac{\mathbf{x}_{ij}}{\|\mathbf{x}_{ij}\|^3} }_{\text{Repulsja}} 
+    + \underbrace{ K_{\text{coh}} (\mathbf{x}_0 - \mathbf{x}_i) }_{\text{Kohezja do Lidera}}
+\end{equation}
+Tak zdefiniowany system gwarantuje nie tylko samoczynne formowanie się klastrów o wspólnej prędkości, ale również odporność na turbulencje oraz brak kolizji fizycznych w przestrzeni trójwymiarowej.
 
 
 \section{Numeryczne całkowanie równań ruchu}
