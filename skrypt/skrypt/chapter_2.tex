@@ -1,4 +1,4 @@
-\chapter{Matematyczne podstawy}
+\chapter{Matematyczne i fizyczne podstawy kinematyki lotu}
 % =======================================================
 \epigraph{\textit{„Matematyka jest alfabetem, za pomocą którego Bóg opisał wszechświat.”}}{--- Galileusz}
 
@@ -100,27 +100,26 @@ Rysunek \ref{fig:wgs84_uklad} przedstawia trójwymiarowy układ kartezjański wp
     \end{itemize}
 \end{itemize}
 
-Przejście z układu elipsoidalnego ($B, L, H$) do pełnego układu kartezjańskiego 3D ($X, Y, Z$) wymaga użycia pierwszego mimośrodu elipsoidy ($e$). Relację tę (rzutowanie na układ geocentryczny) opisują analityczne wzory:
-
+\textbf{Definicja 2.1 (Transformacja Geodezyjna na Kartezjańską).} 
+Przejście z układu elipsoidalnego (geodezyjnego: szerokość $B$, długość $L$, wysokość nad elipsoidą $H$) do pełnego układu kartezjańskiego ECEF $(X, Y, Z)$ wymaga użycia kwadratu pierwszego mimośrodu elipsoidy ($e^2$). Transformację tę opisują analityczne wzory:
 \begin{align}
     X &= (N + H) \cos B \cos L \\
     Y &= (N + H) \cos B \sin L \\
-    Z &= [N(1 - e^2) + H] \sin B
+    Z &= \left[N(1 - e^2) + H\right] \sin B
 \end{align}
-
-gdzie wspomniany już wcześniej promień krzywizny $N$ dany jest wzorem:
+gdzie $N$ jest krzywizną promienia w danym wertykale (promieniem normalnym do osi obrotu Ziemi):
 \begin{equation}
     N = \frac{a}{\sqrt{1 - e^2 \sin^2 B}}
 \end{equation}
 
-Rozwiązanie problemu odwrotnego (wyznaczenie szerokości i długości ze współrzędnych kartezjańskich $X, Y, Z$) jest zagadnieniem znacznie bardziej złożonym i na drodze obliczeniowej wymaga implementacji algorytmów iteracyjnych, przybliżających wartość kąta $B$ aż do osiągnięcia ustalonego progu zbieżności.
+Rozwiązanie problemu odwrotnego (wyznaczenie szerokości $B$ i długości $L$ ze współrzędnych kartezjańskich $X, Y, Z$) jest analitycznie skomplikowane i na drodze obliczeniowej wymaga implementacji algorytmów iteracyjnych.
 
 \subsection{Układy płaskie (Odwzorowania Kartograficzne)}
-Choć globalny system GPS zapewnia dokładność pozycjonowania 3D, z punktu widzenia projektowania map ortofotomap (fotogrametria z dronów) oraz matematycznego planowania trajektorii skanowania pól – znacznie wygodniej jest operować na standardowym układzie płaskim w metrach. W tym celu korzysta się z procedur zwanych odwzorowaniami kartograficznymi, które pozwalają „rozwinąć” trójwymiarową sferę na dwuwymiarowy arkusz $x, y$. 
+Choć globalny system GPS zapewnia dokładność pozycjonowania 3D, z punktu widzenia projektowania map ortofotomap (fotogrametria z dronów) oraz matematycznego planowania trajektorii skanowania pól, znacznie wygodniej jest operować na standardowym układzie płaskim w metrach. W tym celu korzysta się z procedur zwanych odwzorowaniami kartograficznymi, które pozwalają „rozwinąć” trójwymiarową sferę na dwuwymiarowy arkusz $x, y$. 
 
 W geodezji najcenniejsze są odwzorowania wiernokątne (np. Gaussa-Krügera lub Merkatora), które choć zniekształcają (w minimalnym stopniu) długości, to nie zniekształcają w ogóle kątów na mapie, co jest kluczowe dla poprawności nawigacyjnej i obliczania azymutów. 
 
-\subsubsection{Układ NED}
+\subsubsection{Lokalny układ odniesienia drona: Układ NED}
 W kontekście programowania autonomicznych misji BSP, nie używamy skomplikowanych państwowych odwzorowań geodezyjnych na duże dystanse (jak polski system PUGK'65 czy PL-1992). Loty dronów trwają stosunkowo krótko i w małym promieniu operacyjnym. Dlatego zamiast odwzorowań walcowych wprowadzamy tzw. \textbf{Lokalny System Kartezjański}, potocznie określany w literaturze lotniczej mianem układu \textbf{NED} (\textit{North, East, Down}).
 
 \begin{figure}[ht]
@@ -175,14 +174,12 @@ def get_distance_metres(loc1, loc2):
 Tak przedstawiona dualność opisu trajektorii pozwala algorytmice drona realizować misje na geometrycznie doskonałej, dwuwymiarowej tablicy kartezjańskiej (co wybitnie sprawdza się m.in. w implementacji algorytmów Sweep-Line i Kosiarki z modułu CPP), jednocześnie gwarantując wykonanie poprawnego, wolnego od dryfu satelitarnego toru przelotu w świecie rzeczywistym.
 
 
-
-
 \section{Krzywe parametryczne w modelowaniu trajektorii}
 
 W klasycznym podejściu nawigacyjnym trajektorię lotu definiuje się jako uporządkowany ciąg punktów orientacyjnych (ang. \textit{waypoints}) $W = \{w_1, w_2, \dots, w_m\} \subset \mathbb{R}^3$, połączonych odcinkami prostoliniowymi. Choć metoda ta sprawdza się w misjach transportowych na dużych wysokościach, posiada fundamentalne wady w sterowaniu autonomicznym:
 \begin{itemize}
     \item \textbf{Brak gładkości ($C^0$):} W węzłach $w_i$ wektor prędkości doznaje skokowej zmiany kierunku. Realizacja takiego ruchu przez układ fizyczny wymagałaby nieskończenie dużych sił (przyspieszeń), co w praktyce wymusza wyhamowanie statku niemal do zera przed każdym zakrętem.
-    \item \textbf{Nieoptymalne zużycie energii:} Ciągłe cykle hamowania i przyspieszania drastycznie skracają czas pracy akumulatorów LiPo.
+    \item \textbf{Nieoptymalne zużycie energii:} Ciągłe cykle hamowania i przyspieszania drastycznie skracają czas pracy akumulatorów.
 \end{itemize}
 
 Rozwiązaniem tego problemu jest modelowanie toru ruchu za pomocą \textbf{krzywych parametrycznych klasy co najmniej $C^2$} (dwukrotnie różniczkowalnych w sposób ciągły):
@@ -205,7 +202,7 @@ Z mechaniki newtonowskiej wynika, że ruch po krzywej o krzywiźnie $\kappa(t)$ 
 \begin{equation}
     a_n(t) = v^2(t) \cdot \kappa(t)
 \end{equation}
-Ponieważ maksymalny kąt przechylenia drona (ang. \textit{tilt angle}) jest ograniczony parametrami konstrukcyjnymi i stabilnością aerodynamiczną, maksymalne dopuszczalne przyspieszenie boczne wynosi $a_{\max} = g \tan(\theta_{\max})$. Wprowadza to twarde ograniczenie na prędkość w zakręcie:
+Ponieważ maksymalny kąt przechylenia drona (ang. \textit{tilt angle}) $\theta_{max}$ jest zadany parametrami konstrukcyjnymi i aerodynamicznymi, maksymalne dopuszczalne przyspieszenie boczne wynosi $a_{\max} = g \tan(\theta_{\max})$. Wprowadza to ograniczenie na prędkość w zakręcie:
 \begin{equation}
     v(t) \le \sqrt{\frac{a_{\max}}{\kappa(t)}}
 \end{equation}
@@ -213,8 +210,34 @@ W punktach o dużej krzywiźnie $\kappa$ (ostre skręty) dron musi zredukować p
 
 \subsubsection{Przykłady krzywych analitycznych}
 
-W module \texttt{02\_fizyka\_i\_matematyka} (skrypt \texttt{03\_parametric\_shapes.py}) zaimplementowano trzy reprezentatywne geometrie:
+W module \texttt{02\_fizyka\_i\_matematyka} (skrypt \texttt{03\_parametric\_shapes.py}) zaimplementowano trzy reprezentatywne geometrie. Na rysunku \ref{fig:krzywe2d} przedstawiono ich kształty, generowane bezpośrednio ze wzorów parametrycznych.
 
+\begin{figure}[ht]
+    \centering
+    \begin{tabular}{ccc}
+    \begin{tikzpicture}[scale=0.6]
+        \draw[->, gray] (-2,0) -- (1,0) node[right] {$x$};
+        \draw[->, gray] (0,-2) -- (0,2) node[above] {$y$};
+        \draw[thick, blue, domain=0:360, samples=100] plot ( {cos(\x)-1}, {sin(\x)} );
+        \filldraw (0,0) circle (2pt) node[below right] {Start};
+    \end{tikzpicture} &
+    \begin{tikzpicture}[scale=0.6]
+        \draw[->, gray] (-2,0) -- (2,0) node[right] {$x$};
+        \draw[->, gray] (0,-1.5) -- (0,1.5) node[above] {$y$};
+        \draw[thick, red, domain=0:360, samples=100] plot ( {1.5*sin(\x)}, {1.5*sin(\x)*cos(\x)} );
+        \filldraw (0,0) circle (2pt) node[below right] {Węzeł};
+    \end{tikzpicture} &
+    \begin{tikzpicture}[scale=0.6]
+        \draw[->, gray] (-3,0) -- (1,0) node[right] {$y$};
+        \draw[->, gray] (0,-2) -- (0,2) node[above] {$x$};
+        \draw[thick, green!60!black, domain=0:360, samples=100] plot ( {0.1*(13*cos(\x) - 5*cos(2*\x) - 2*cos(3*\x) - cos(4*\x)) - 1.2}, {0.1*(16*sin(\x)^3)} );
+        \filldraw (0,0) circle (2pt) node[above left] {Ostrze};
+    \end{tikzpicture} \\
+    (a) Okrąg (z offsetem) & (b) Lemniskata Gerono & (c) Kardioida
+    \end{tabular}
+    \caption{Przykładowe trajektorie 2D.}
+    \label{fig:krzywe2d}
+\end{figure}
 \paragraph{1. Okrąg (Krzywa o stałej krzywiźnie):}
 Najprostsza krzywa zamknięta o stałej krzywiźnie $\kappa = \frac{1}{R}$:
 \begin{equation}
@@ -259,7 +282,7 @@ W skrypcie \texttt{03\_parametric\_shapes.py} zaimplementowano \textbf{pętlę n
 \end{equation}
 Ustawienie $r_{\text{tol}} \approx 2.0\text{ m}$ działa jak mechaniczny filtr dolnoprzepustowy. Autopilot przełącza cel na kolejny punkt zanim statek zbiegnie do punktu bieżącego. Wykorzystuje to bezwładność drona do naturalnego zaokrąglania krzywej, eliminując szarpnięcia bez konieczności obliczania złożonych wielomianów wyższych rzędów na pokładzie mikrokontrolera.
 
-
+% -------------------------------------------------------
 \subsection{Krzywe w przestrzeni 3D}
 
 W trójwymiarowej przestrzeni euklidesowej $\mathbb{R}^3$ trajektoria zyskuje dodatkowy stopień swobody: zmianę wysokości w czasie ($z(t)$). Z punktu widzenia geometrii różniczkowej, krzywą przestrzenną charakteryzują dwie wielkości lokalne: \textbf{krzywizna} $\kappa(t)$ oraz \textbf{skręcenie (torsja)} $\tau(t)$, opisujące zachowanie reperu Freneta-Serreta $(\mathbf{T}, \mathbf{N}, \mathbf{B})$:
@@ -270,8 +293,33 @@ W trójwymiarowej przestrzeni euklidesowej $\mathbb{R}^3$ trajektoria zyskuje do
 \end{equation}
 gdzie $s$ oznacza naturalny parametr długości łuku, $\mathbf{T}$ wektor styczny, $\mathbf{N}$ normalny, a $\mathbf{B} = \mathbf{T} \times \mathbf{N}$ binormalny. Torsja $\tau(t)$ określa tempo, z jakim krzywa "ucieka" z płaszczyzny ściśle stycznej.
 
+\begin{figure}[ht]
+    \centering
+    \begin{tikzpicture}[scale=0.8]
+        \begin{axis}[
+            view={60}{30}, width=8cm, height=8cm, grid=major,
+            xlabel=$x$, ylabel=$y$, zlabel=$z$,
+            title={(a) Helisa Walcowa}]
+            \addplot3[domain=0:5*pi, samples=100, samples y=0, thick, blue]
+                ({cos(deg(x))}, {sin(deg(x))}, {x/(2*pi)});
+        \end{axis}
+    \end{tikzpicture}
+    \hspace{0.5cm}
+    \begin{tikzpicture}[scale=0.8]
+        \begin{axis}[
+            view={60}{30}, width=8cm, height=8cm, grid=major,
+            xlabel=$x$, ylabel=$y$, zlabel=$z$,
+            title={(b) Helisa Stożkowa (Lejek)}]
+            \addplot3[domain=0:5*pi, samples=100, samples y=0, thick, red]
+                ({(1-x/(5*pi))*cos(deg(x))}, {(1-x/(5*pi))*sin(deg(x))}, {1 - x/(5*pi)});
+        \end{axis}
+    \end{tikzpicture}
+    \caption{Przykładowe trajektorie 3D. Helisa walcowa utrzymuje stały promień przy locie wertykalnym, podczas gdy helisa stożkowa zawęża się w miarę zmiany wysokości.}
+    \label{fig:krzywe3d}
+\end{figure}
+
 \subsubsection{Helisa walcowa (Cylindrical Helix)}
-Najprostsza trójwymiarowa krzywa przestrzenna o stałej krzywiźnie i stałym skręceniu. Powstaje przez nałożenie jednostajnego ruchu postępowego wzdłuż osi $z$ na ruch po okręgu:
+Jak ukazuje Rysunek \ref{fig:krzywe3d}a, jest to najprostsza krzywa przestrzenna o stałej krzywiźnie i stałym skręceniu. Powstaje przez nałożenie jednostajnego ruchu postępowego wzdłuż osi $z$ na ruch po okręgu:
 \begin{equation}
     \mathbf{r}(t) = \begin{bmatrix} R \cos(\omega t) \\ R \sin(\omega t) \\ v_z \cdot t \end{bmatrix}, \quad t \ge 0
 \end{equation}
@@ -282,7 +330,7 @@ Własności różniczkowe helisy walcowej wyrażają się wzorami:
 Krzywa ta jest podstawowym wzorcem wykorzystywanym przy inspekcjach obiektów pionowych o przekroju kołowym (kominy, wieże telekomunikacyjne, turbiny wiatrowe).
 
 \subsubsection{Helisa stożkowa (Conical Helix) -- Lejek poszukiwawczy}
-W misjach poszukiwawczo-ratowniczych (SAR -- \textit{Search and Rescue}) stosuje się trajektorię o zmiennym promieniu i malejącej wysokości. Dron rozpoczyna przeszukiwanie na wysokim pułapie, zataczając szerokie kręgi w celu wykrycia sygnału z nadajnika ratunkowego, a następnie zawęża promień w miarę obniżania lotu, koncentrując się na źródle sygnału.
+W misjach poszukiwawczo-ratowniczych (SAR -- \textit{Search and Rescue}) stosuje się trajektorię o zmiennym promieniu i malejącej wysokości (Rysunek \ref{fig:krzywe3d}b). Dron rozpoczyna przeszukiwanie na wysokim pułapie, zataczając szerokie kręgi w celu wykrycia sygnału z nadajnika ratunkowego, a następnie zawęża promień w miarę obniżania lotu, koncentrując się na źródle sygnału.
 
 Równanie parametryczne helisy stożkowej ma postać:
 \begin{equation}
@@ -304,7 +352,7 @@ Kinematyka tego ruchu wymaga od sterownika jednoczesnej modulacji prędkości we
         -v_z
     \end{bmatrix}
 \end{equation}
-gdzie $\dot{R}(t) = -\frac{\alpha R_0}{t_k} = \text{const}$. 
+gdzie prędkość zmiany promienia $\dot{R}(t) = -\frac{\alpha R_0}{t_k} = \text{const}$. 
 
 \subsubsection{Trajektorie na powierzchniach walcowych (Inspekcja 3D)}
 W zaawansowanych misjach fotogrametrycznych (patrz skrypt \texttt{07\_c\_cylinder\_scan.py}) trajektorię generuje się nie w przestrzeni swobodnej, lecz w oparciu o geometrię badanego obiektu. 
@@ -412,6 +460,7 @@ Ostateczny kształt hybrydowego równania różniczkowego ruchu dyskretnie całk
 Tak zdefiniowany system gwarantuje nie tylko samoczynne formowanie się klastrów o wspólnej prędkości, ale również odporność na turbulencje oraz brak kolizji fizycznych w przestrzeni trójwymiarowej.
 
 
+
 \section{Numeryczne całkowanie równań ruchu}
 
 Kontrolery lotu oraz środowiska symulacyjne pracują w czasie dyskretnym. Rozwiązanie analityczne układu nieliniowych równań $\mathbf{x}'' = f(\mathbf{x}, \mathbf{x}', t)$ jest niemożliwe. Z tego powodu krzywą trajektorii przybliża się numerycznie krok po kroku w ustalonych odstępach czasu $\Delta t$.
@@ -477,3 +526,285 @@ Po wyznaczeniu wszystkich czterech wektorów kierunkowych $\mathbf{k}_i$, dokonu
 \end{equation}
 
 Z programistycznego punktu widzenia, zaimplementowanie metody RK4 sprowadza się do wywołania funkcji dynamiki układu $\mathbf{F}(t, \mathbf{y})$ czterokrotnie na każdą klatkę fizyki. Złożoność algorytmu jest czterokrotnie większa niż dla metody Eulera, lecz uzyskany radykalny spadek błędu pozwala na znaczne wydłużenie kroku $\Delta t$, co rekompensuje nadmiarowość procesów ALU (jednostek arytmetyczno-logicznych) procesora pokładowego.
+
+
+\section{Dynamika bryły sztywnej w 6 stopniach swobody (6-DOF)}
+
+W zaawansowanych modelach symulacyjnych (takich jak wewnętrzny silnik fizyczny środowiska SITL) bezzałogowy statek powietrzny nie jest traktowany jako nieskończenie mały punkt materialny. Analizuje się go jako \textbf{bryłę sztywną} (ang. \textit{rigid body}) – układ punktów materialnych, w którym odległości między dowolnymi dwoma punktami pozostają stałe w czasie, niezależnie od działających sił zewnętrznych.
+
+Aby w pełni zdefiniować stan bryły sztywnej w przestrzeni trójwymiarowej $\mathbb{R}^3$, niezbędne jest określenie jej \textbf{sześciu stopni swobody (6-DOF -- Six Degrees of Freedom)}:
+\begin{itemize}
+    \item Trzech stopni translacyjnych: definiujących pozycję środka masy statku $[x, y, z]^T$ względem inercjalnego układu odniesienia (np. układu NED).
+    \item Trzech stopni rotacyjnych: definiujących orientację kątową statku względem tego samego układu.
+\end{itemize}
+
+\begin{figure}[ht]
+    \centering
+    \vspace{0.5cm}
+    \begin{tikzpicture}[x=(-150:1cm), y=(0:1cm), z=(90:1cm), scale=2.5]
+        
+        % Środek ciężkości (CoG)
+        \coordinate (O) at (0,0,0);
+        \filldraw[black] (O) circle (1pt) node[above right, xshift=2mm] {CoG (Środek Masy)};
+
+        % Ramiona drona (Konfiguracja X)
+        \draw[line width=1.5pt, gray!80, line cap=round] (-1,-1,0) -- (1,1,0);
+        \draw[line width=1.5pt, gray!80, line cap=round] (-1,1,0) -- (1,-1,0);
+        
+        % Silniki i Śmigła (Rysowanie płaskich okręgów w płaszczyźnie XY)
+        \begin{scope}[canvas is xy plane at z=0]
+            \foreach \x/\y/\n/\dir in {-1/-1/1/CW, -1/1/2/CCW, 1/1/3/CW, 1/-1/4/CCW} {
+                \filldraw[darkgray] (\x,\y) circle (0.15); % Silnik
+                \draw[thick, dashed] (\x,\y) circle (0.5); % Zasięg śmigła
+                \node[below, fill=white, inner sep=1pt, yshift=-3mm] at (\x,\y) {$M_\n$ (\dir)};
+            }
+        \end{scope}
+
+        % Osie Body Frame (Wydłużone)
+        \draw[->, >=stealth, line width=1.2pt, red] (O) -- (2.0,0,0) node[right, xshift=2mm] {$X_B$ (Przód)};
+        \draw[->, >=stealth, line width=1.2pt, green!60!black] (O) -- (0,2.0,0) node[right, xshift=2mm] {$Y_B$ (Prawe ramię)};
+        \draw[->, >=stealth, line width=1.2pt, blue] (O) -- (0,0,-2.0) node[below, yshift=-2mm] {$Z_B$ (Dół)};
+
+        % --- Kąty Eulera z użyciem płaszczyzn 3D ---
+        
+        % Roll (Obrót wokół osi X_B -> Leży w płaszczyźnie YZ)
+        \begin{scope}[canvas is yz plane at x=1.5]
+            \draw[->, >=stealth, red, thick] (0.4, 0) arc (0:270:0.4) node[midway, right] {Roll ($\phi$)};
+        \end{scope}
+
+        % Pitch (Obrót wokół osi Y_B -> Leży w płaszczyźnie XZ)
+        \begin{scope}[canvas is xz plane at y=1.5]
+            \draw[->, >=stealth, green!60!black, thick] (0.4, 0) arc (0:-270:0.4) node[midway, below] {Pitch ($\theta$)};
+        \end{scope}
+
+        % Yaw (Obrót wokół osi Z_B -> Leży w płaszczyźnie XY)
+        \begin{scope}[canvas is xy plane at z=-1.5]
+            \draw[->, >=stealth, blue, thick] (0.4, 0) arc (0:-270:0.4) node[midway, right] {Yaw ($\psi$)};
+        \end{scope}
+
+    \end{tikzpicture}
+    \vspace{0.5cm}
+    \caption{Model wielowirnikowca jako bryły sztywnej (Konfiguracja Quad-X). Układ współrzędnych związany z ciałem ($\mathcal{B}$) ma początek w środku masy (CoG). Osie $X_B, Y_B, Z_B$ określają kierunki odniesienia dla kątów Eulera oraz tensorów bezwładności.}
+    \label{fig:rigid_body}
+\end{figure}
+
+\subsection{Równania ruchu Newtona-Eulera i Tensor Bezwładności}
+
+Ruch drona opisuje się za pomocą dwóch nierozerwalnie połączonych układów odniesienia. Pierwszym jest układ inercjalny $\mathcal{I}$ (związany z Ziemią, np. układ NED). Drugim jest zilustrowany na Rysunku \ref{fig:rigid_body} \textbf{układ związany z ciałem $\mathcal{B} = \{O_B; \mathbf{i}_B, \mathbf{j}_B, \mathbf{k}_B\}$} (ang. \textit{Body Frame}), którego środek $O_B$ pokrywa się ze środkiem masy drona.
+
+Równania dynamiki bryły sztywnej rozdzielają ruch na translację środka masy oraz rotację wokół niego. W układzie związanym z ciałem ($\mathcal{B}$) przyjmują one postać wektorową:
+\begin{align}
+    m (\mathbf{\dot{v}} + \boldsymbol{\omega} \times \mathbf{v}) &= \mathbf{F} \label{eq:newton_trans} \\
+    \mathbf{J} \mathbf{\dot{\boldsymbol{\omega}}} + \boldsymbol{\omega} \times (\mathbf{J} \boldsymbol{\omega}) &= \boldsymbol{\tau} \label{eq:euler_rot}
+\end{align}
+gdzie:
+\begin{itemize}
+    \item $m$ to całkowita masa statku, odpowiedzialna za bezwładność w ruchu translacyjnym.
+    \item $\mathbf{v} = [u, v, w]^T$ to wektor prędkości liniowej, a $\boldsymbol{\omega} = [p, q, r]^T$ to wektor prędkości kątowej.
+    \item $\mathbf{F}$ to wektor sił zewnętrznych (grawitacja, ciąg silników, opór aerodynamiczny).
+    \item $\boldsymbol{\tau}$ to wektor momentów sił (ang. \textit{torque}) próbujących obrócić statek wokół osi $X_B, Y_B, Z_B$.
+    \item $\mathbf{J}$ to \textbf{tensor momentu bezwładności}.
+\end{itemize}
+
+\textbf{Fizyczna interpretacja Tensora Bezwładności ($\mathbf{J}$):} O ile masa stawia opór przy próbie przesunięcia obiektu, o tyle tensor bezwładności stawia opór przy próbie jego obrócenia. Zapisujemy go jako macierz:
+\begin{equation}
+    \mathbf{J} = \begin{bmatrix} 
+    I_{xx} & -I_{xy} & -I_{xz} \\ 
+    -I_{yx} & I_{yy} & -I_{yz} \\ 
+    -I_{zx} & -I_{zy} & I_{zz} 
+    \end{bmatrix}
+\end{equation}
+Dla klasycznego drona (Rys. \ref{fig:rigid_body}) masa jest rozłożona symetrycznie wzdłuż ramion. Oznacza to, że środek masy pokrywa się z początkiem układu, a momenty dewiacyjne (np. $I_{xy}$) znikają. Tensor staje się macierzą diagonalną z wartościami $I_{xx}$ (bezwładność przechyłu), $I_{yy}$ (bezwładność pochylenia) i $I_{zz}$ (bezwładność odchylenia na boki).
+
+Zauważmy na równaniu \eqref{eq:euler_rot} składnik nieliniowy $\boldsymbol{\omega} \times (\mathbf{J} \boldsymbol{\omega})$. Dowodzi on ważnego faktu inżynierskiego: obrót wokół jednej osi w przestrzeni automatycznie indukuje momenty sił na pozostałych osiach (tzw. zjawisko precesji żyroskopowej). Zmusza to kontrolery lotu drona do nieustannej, jednoczesnej kompensacji wszystkich osi na raz.
+
+
+\subsection{Kąty Eulera: Orientacja w przestrzeni}
+
+Orientacja układu statku ($\mathcal{B}$) względem ziemi ($\mathcal{I}$) nie jest zjawiskiem statycznym. Transformacja wektorów pomiędzy tymi układami realizowana jest w oparciu o sekwencję trzech elementarnych obrotów. W lotnictwie standardowo przyjęto konwencję obrotów w kolejności Z-Y-X (konwencja Tait-Bryan). Wynikowe kąty nazywamy Kątami Eulera (Rysunek \ref{fig:eulery_samolot}) i definiujemy następująco:
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.6\textwidth]{figures/samolot_eulery.png}
+    \caption{Wizualizacja Kątów Eulera w lotnictwie (Roll $\phi$, Pitch $\theta$, Yaw $\psi$) określających orientację układu związanego z ciałem względem inercjalnego układu odniesienia.}
+    \label{fig:eulery_samolot}
+\end{figure}
+
+\begin{enumerate}
+    \item \textbf{Yaw (Odchylenie -- $\psi$):} Pierwszy obrót wykonywany wokół osi pionowej $Z_I$. Definiuje kierunek geograficzny (\textit{heading}). Macierz tej transformacji to:
+    \begin{equation}
+        \mathbf{R}_Z(\psi) = \begin{bmatrix} \cos\psi & -\sin\psi & 0 \\ \sin\psi & \cos\psi & 0 \\ 0 & 0 & 1 \end{bmatrix}
+    \end{equation}
+    \item \textbf{Pitch (Pochylenie -- $\theta$):} Drugi obrót wokół nowo powstałej osi $Y'$. Odpowiada za pochylenie nosa w dół (lot do przodu) lub w górę (lot do tyłu).
+    \begin{equation}
+        \mathbf{R}_Y(\theta) = \begin{bmatrix} \cos\theta & 0 & \sin\theta \\ 0 & 1 & 0 \\ -\sin\theta & 0 & \cos\theta \end{bmatrix}
+    \end{equation}
+    \item \textbf{Roll (Przechył -- $\phi$):} Trzeci obrót wokół finalnej osi $X''$. Odpowiada za przechylenie na lewe lub prawe skrzydło, co indukuje ruch boczny (ang. \textit{strafing}).
+    \begin{equation}
+        \mathbf{R}_X(\phi) = \begin{bmatrix} 1 & 0 & 0 \\ 0 & \cos\phi & -\sin\phi \\ 0 & \sin\phi & \cos\phi \end{bmatrix}
+    \end{equation}
+\end{enumerate}
+
+Mnożąc te trzy macierze przez siebie, otrzymujemy pełną macierz kierunków kosinusowych $\mathbf{R}_{B}^{I} = \mathbf{R}_Z(\psi) \mathbf{R}_Y(\theta) \mathbf{R}_X(\phi)$, która rzutuje wektor z osi drona wprost na układ inercjalny (NED). Rozpisując ten iloczyn analitycznie:
+\begin{equation}
+\mathbf{R}_{B}^{I} = 
+\begin{bmatrix}
+\cos\psi \cos\theta & \cos\psi \sin\theta \sin\phi - \sin\psi \cos\phi & \cos\psi \sin\theta \cos\phi + \sin\psi \sin\phi \\
+\sin\psi \cos\theta & \sin\psi \sin\theta \sin\phi + \cos\psi \cos\phi & \sin\psi \sin\theta \cos\phi - \cos\psi \sin\phi \\
+-\sin\theta & \cos\theta \sin\phi & \cos\theta \cos\phi
+\end{bmatrix}
+\end{equation}
+Zgodnie z własnościami grupy specjalnych macierzy ortogonalnych $SO(3)$, transformacja odwrotna (z $\mathcal{I}$ do $\mathcal{B}$) to po prostu jej transpozycja: $(\mathbf{R}_{B}^{I})^{-1} = (\mathbf{R}_{B}^{I})^T$.
+
+\textbf{Osobliwość kinematyczna (Gimbal Lock):} Model Kątów Eulera posiada punkt osobliwy dla $\theta = \pm \frac{\pi}{2}$. Wówczas $\cos\theta = 0$, co prowadzi do utraty jednego stopnia swobody – osie obrotu Roll i Yaw stają się współliniowe. Z tego względu algorytmy fuzji sensorów (EKF) w dronach całkowicie porzucają Kąty Eulera na rzecz bezosobliwościowej algebry kwaternionów, pozostawiając reprezentację Eulera jedynie jako wyjście interfejsu dla człowieka.
+
+% -------------------------------------------------------
+\subsection{Generowanie sił i momentów: Kinematyka wielowirnikowca}
+
+Wielowirnikowce to układy niedosterowane (ang. \textit{underactuated}) – posiadają sześć stopni swobody, ale jedynie cztery zmienne sterujące (kątowe prędkości obrotowe wirników: $\Omega_1, \dots, \Omega_4$). Każdy manewr jest zatem wynikiem modulacji tych czterech wejść.
+
+\textbf{Twierdzenie 2.1 (Siła i moment aerodynamiczny wirnika).}
+\textit{Zgodnie z teorią elementu łopaty (Blade Element Theory), ciąg $T_i$ oraz moment reakcyjny $M_i$ generowane przez $i$-ty wirnik w gęstości powietrza $\rho$ są kwadratowo zależne od jego prędkości kątowej $\Omega_i$:}
+\begin{equation}
+    T_i = k_f \Omega_i^2, \quad M_i = (-1)^{i+1} k_m \Omega_i^2
+\end{equation}
+\textit{gdzie $k_f > 0$ to stała siły ciągu, $k_m > 0$ to stała oporu aerodynamicznego wirnika, a czynnik $(-1)^{i+1}$ ustala znak momentu w zależności od kierunku obrotu śmigła (CW lub CCW).}
+
+\textbf{Dowód:} 
+Niech $R$ będzie promieniem wirnika. Siła ciągu generowana przez obracający się wirnik w reżimie przepływu stacjonarnego wynosi $T_i = C_T \rho A (\Omega_i R)^2$, gdzie $C_T$ to bezwymiarowy współczynnik ciągu, a $A = \pi R^2$ to pole tarczy wirnika. Grupując stałe dla zadanego statku otrzymujemy $k_f = C_T \rho \pi R^4$. Zatem $T_i = k_f \Omega_i^2$.
+Podobnie, moc potrzebna do pokonania oporu aerodynamicznego to $P_i = C_P \rho A (\Omega_i R)^3$. Zależność między mocą a momentem siły to $P_i = M_i \Omega_i$. Podstawiając to równanie otrzymujemy $M_i = \frac{P_i}{\Omega_i} = C_P \rho \pi R^4 \Omega_i^2$. Przyjmując stałą $k_m = C_P \rho \pi R^4$, otrzymujemy $M_i \propto \Omega_i^2$.
+Zgodnie z III zasadą dynamiki Newtona, obrót śmigła generuje na ramie drona moment reakcyjny o przeciwnym zwrocie. Aby układ nie obracał się w zawisie samoistnie wokół osi $Z_B$, stosuje się parami przeciwbieżne śmigła, co definiuje naprzemienny znak w wyrażeniu $(-1)^{i+1} k_m \Omega_i^2$. $\blacksquare$
+
+\vspace{1em}
+\textbf{Alokacja sterowania (Control Allocation)}
+
+Całkowite wymuszenie działające na drona sprowadza się do wyznaczenia jednego wektora siły ciągu $\mathbf{F}_{\text{thrust}}$ (wzdłuż osi $Z_B$) oraz trzech momentów sił $\boldsymbol{\tau} = [\tau_x, \tau_y, \tau_z]^T$. 
+
+Zgodnie z definicją momentu siły $\boldsymbol{\tau}_i = \mathbf{r}_i \times \mathbf{T}_i$, położenie silników na ramie w konfiguracji "X" determinuje ich wpływ na obrót statku. Niech $l$ będzie odległością silnika od środka masy $O_B$. Ponieważ ramiona są odchylone o kąt $\frac{\pi}{4}$ od osi głównych $X_B$ i $Y_B$, ramię siły względem każdej z tych osi wynosi $l \sin(\frac{\pi}{4}) = l \frac{\sqrt{2}}{2}$.
+
+Sumując wpływy wszystkich czterech wirników, macierz alokacji przekształca wektor kwadratów prędkości obrotowych $\boldsymbol{\Omega}^2$ na wektor sił i momentów:
+\begin{equation}
+    \begin{bmatrix}
+    F_{\text{thrust}} \\ \tau_x \\ \tau_y \\ \tau_z
+    \end{bmatrix}
+    =
+    \begin{bmatrix}
+    k_f & k_f & k_f & k_f \\
+    -\frac{\sqrt{2}}{2}lk_f & \frac{\sqrt{2}}{2}lk_f & \frac{\sqrt{2}}{2}lk_f & -\frac{\sqrt{2}}{2}lk_f \\
+    \frac{\sqrt{2}}{2}lk_f & -\frac{\sqrt{2}}{2}lk_f & \frac{\sqrt{2}}{2}lk_f & -\frac{\sqrt{2}}{2}lk_f \\
+    k_m & k_m & -k_m & -k_m
+    \end{bmatrix}
+    \begin{bmatrix}
+    \Omega_1^2 \\ \Omega_2^2 \\ \Omega_3^2 \\ \Omega_4^2
+    \end{bmatrix}
+\end{equation}
+
+Powyższa transformacja jest odwracalna (wyznacznik macierzy jest różny od zera), co jest fundamentalnym warunkiem sterowalności Quada. Pokazuje ona również mechanizm lotu wektorowego:
+\begin{itemize}
+    \item \textbf{Wysokość ($Z$):} Modulacja sumaryczna ciągu (pierwszy wiersz macierzy). Aby przyspieszyć w górę, wszystkie silniki muszą zwiększyć obroty $\Delta \Omega^2 > 0$.
+    \item \textbf{Obrót Roll ($\tau_x$):} Generowany przez różnicę prędkości między prawą a lewą stroną ramy. 
+    \item \textbf{Obrót Pitch ($\tau_y$):} Generowany przez różnicę prędkości między silnikami przednimi a tylnymi. To pochylenie jest warunkiem koniecznym do rzutowania wektora ciągu na oś poziomą i rozpoczęcia lotu postępowego drona.
+    \item \textbf{Obrót Yaw ($\tau_z$):} Naruszenie równowagi momentów reakcyjnych (ostatni wiersz). Przyspieszenie pary kręcącej się zgodnie ze wskazówkami zegara, przy jednoczesnym zwolnieniu drugiej pary, obraca drona wokół osi pionowej bez wpływu na jego wysokość.
+\end{itemize}
+
+\section{Zakłócenia zewnętrzne i estymacja stanu}
+
+Gdyby warunki otoczenia były idealne, równania różniczkowe ruchu wyliczane na bieżąco przez mikroprocesor zgadzałyby się w 100\% z fizycznym stanem maszyny. W takiej sytuacji sterowanie mogłoby opierać się wyłącznie na całkowaniu wektora przyspieszenia (tzw. nawigacja zliczeniowa, ang. \textit{Dead Reckoning}). W rzeczywistości jednak statek podlega nieliniowym zakłóceniom zewnętrznym, a aparatura pomiarowa dostarcza sygnałów obarczonych szumem.
+
+\subsection{Szum sensorów pokładowych}
+
+Informacje o środowisku zewnętrznym oraz stanie własnym dron czerpie ze zintegrowanego modułu czujników. Każdy z nich charakteryzuje się specyficznym profilem błędu pomiarowego (traktowanym w automatyce jako zmienna losowa o rozkładzie normalnym):
+\begin{itemize}
+    \item \textbf{IMU (Inertial Measurement Unit):} Moduł składający się z mikromechanicznych (MEMS) akcelerometrów i żyroskopów. Mierzy on przyspieszenia i prędkości kątowe z ogromną częstotliwością (np. 1000 Hz). Niestety rejestruje również bezużyteczny szum wysokiej częstotliwości (np. uderzenia fal powietrza o obudowę czy wibracje ramy silników). Co gorsza, IMU szybko wpada w tzw. \textit{dryf termiczny} – całkowanie nawet mikroskopijnego błędu stałego powoduje lawinowe narastanie błędu obliczonej pozycji wraz z upływem czasu.
+    \item \textbf{GPS (GNSS):} Globalny system satelitarny dostarczający danych absolutnych. Jest on niezwykle odporny na powolny dryf, jednak obarczony szumem wielodrogowości (interferencje wywołane odbijaniem się sygnału radiowego od budynków). Czas odświeżania GPS jest również bardzo wolny (zazwyczaj 5 Hz), co oznacza, że pomiędzy odczytami satelitów dron porusza się "w ciemno".
+    \item \textbf{Barometr:} Zapewnia odczyt ciśnienia statycznego w celu estymacji wysokości atmosferycznej. Cierpi z powodu gwałtownych zjawisk pogodowych – silny, pionowy podmuch wiatru potrafi fałszywie zasugerować zmianę ciśnienia, co algorytm mylnie zinterpretuje jako spadek drona.
+\end{itemize}
+
+\subsection{Rozszerzony Filtr Kalmana (EKF)}
+
+Dla zapewnienia stabilności platformy żaden z wymienionych czujników nie może funkcjonować samodzielnie. W zaawansowanych systemach lotniczych (także w rdzeniu środowiska SITL) działa potężny algorytm fuzji danych – \textbf{Rozszerzony Filtr Kalmana (EKF, ang. \textit{Extended Kalman Filter})}.
+
+Algorytm EKF to rekurencyjny estymator matematyczny pracujący w ciągłej pętli dwuetapowej:
+\begin{enumerate}
+    \item \textbf{Faza predykcji (Modelowanie):} W oparciu o stan w chwili poprzedniej oraz odczyty z żyroskopu (traktowane tu jako sterowanie), EKF przewiduje, gdzie dron \textit{powinien} się znajdować w obecnej chwili.
+    \item \textbf{Faza korekcji (Update):} Ułamek sekundy później EKF otrzymuje nowy, zaszumiony odczyt z wolniejszych czujników absolutnych (GPS, kompas). Mierzy on rozbieżność między swoimi matematycznymi oczekiwaniami a faktycznym pomiarem (tzw. innowację). 
+\end{enumerate}
+
+Na podstawie macierzy kowariancji błędu (która waży "pewność" predykcji w stosunku do "pewności" pomiaru czujnika), algorytm EKF estymuje wektor stanu o największym prawdopodobieństwie, odrzucając losowe ekstrema szumów.
+
+\subsection{Zjawisko znoszenia (Wind drift) i estymacja wiatru}
+
+Poza szumami aparatury układ kinematyczny poddawany jest ciągłym uderzeniom wiatru. Zjawisko znoszenia jest na tyle dominujące w lotnictwie bezzałogowym, że lekki, ważący 2 kg dron zostałby zwiany z zadanego kursu zaledwie po kilku sekundach. Filtr EKF służy nie tylko do poprawy jakości pomiaru pozycji, ale potrafi aktywnie wyestymować niewidzialny dla czujników wektor wiatru!
+
+\begin{figure}[ht]
+    \centering
+    \begin{tikzpicture}[scale=1.5]
+        % Płaszczyzna Ziemi
+        \draw[thick, black] (-3, 0) -- (3, 0) node[right] {Ziemia};
+        
+        % Oś pionowa zawisu (celu)
+        \draw[dashed, gray] (0, 0) -- (0, 3);
+        \filldraw[red] (0,0) circle (2pt) node[below] {Punkt docelowy GPS};
+
+        % Dron pochylony pod wiatr (Crabbing)
+        \coordinate (CoG) at (0, 2);
+        \begin{scope}[shift={(CoG)}, rotate=-25]
+            % Rama drona
+            \draw[line width=2pt, darkgray] (-1,0) -- (1,0);
+            % Śmigła
+            \filldraw[black] (-1,0.1) circle (0.05);
+            \draw[thick] (-1.3,0.1) -- (-0.7,0.1);
+            \filldraw[black] (1,0.1) circle (0.05);
+            \draw[thick] (0.7,0.1) -- (1.3,0.1);
+            
+            % Wektor ciągu całkowitego T (prostopadły do ramy)
+            \draw[->, >=stealth, very thick, red] (0,0) -- (0,1.5) node[above right] {Ciąg $\mathbf{T}$};
+            % Składowe ciągu (w lokalnym rzucie)
+            \draw[->, >=stealth, dashed, red!60] (0,0) -- (-0.63,0) node[below left] {$\mathbf{T}_x$};
+        \end{scope}
+
+        % Środek masy
+        \filldraw[black] (CoG) circle (1.5pt);
+
+        % Grawitacja
+        \draw[->, >=stealth, very thick, blue] (CoG) -- (0, 0.6) node[right] {$\mathbf{F}_g = mg$};
+
+        % Wektor Wiatru (zewnętrzny)
+        \draw[->, >=stealth, very thick, cyan, line width=1.5pt] (1.5, 2.3) -- (0.5, 2.3) node[above right] {Wiatr $\mathbf{V}_w$};
+        \draw[->, >=stealth, very thick, cyan, line width=1.5pt] (1.5, 1.7) -- (0.5, 1.7);
+        \draw[->, >=stealth, very thick, cyan, line width=1.5pt] (1.5, 1.1) -- (0.5, 1.1);
+
+        % Łuk kąta pochylenia Pitch
+        \draw[dashed, gray] (CoG) -- (0, 3.5);
+        \draw[->, >=stealth, thick] (0, 2.8) arc (90:115:0.8) node[midway, above] {$\theta$};
+
+    \end{tikzpicture}
+    \caption{Zjawisko pochylania drona pod wiatr (ang. \textit{crabbing}). Aby utrzymać stacjonarny zawis nad punktem GPS w obecności poziomego wiatru, dron celowo pochyla się o kąt $\theta$. Dzięki temu pozioma składowa wektora ciągu $\mathbf{T}_x$ perfekcyjnie równoważy napór wiatru $\mathbf{V}_w$.}
+    \label{fig:wind_crabbing}
+\end{figure}
+
+Sytuacja przedstawiona na Rysunku \ref{fig:wind_crabbing} stanowi szczególny przypadek działania tej fuzji. Wyobraźmy sobie drona w stanie idealnego zawisu (\textit{Hover}). EKF nakazał wyzerowanie kątów Kątów Eulera ($\phi = 0, \theta = 0$), co oznacza, że wektor ciągu skierowany jest idealnie w górę, a jego składowa pozioma wynosi $0$. EKF spodziewa się zatem, że kolejny odczyt GPS wykaże zerowe przesunięcie w przestrzeni.
+
+Jeżeli jednak w układ uderzy nagły wiatr, odczyt satelitarny w następnym kroku czasowym zasygnalizuje przesunięcie statku np. o 3 metry w prawo. Filtr EKF natychmiast wykrywa tę rozbieżność (innowację). Odrzucając mało prawdopodobną w tym momencie awarię żyroskopów, estymator wpisuje do swojej macierzy ukryty stan fizyczny: \textit{„Obecność wektora wiatru o sile 3 m/s”}. Przekazuje tę informację do regulatorów PID, które automatycznie generują wektor ciągu korygujący ten błąd – pochylają maszynę dziobem w stronę podmuchu. Dron zawisa w stabilnej pozycji obrócony pod kątem, a jego prędkość absolutna względem ziemi wynosi dokładnie zero.
+
+\subsection{Przykład praktyczny: Odczyt estymatora wiatru EKF}
+
+W kursie (w module \texttt{02\_fizyka\_i\_matematyka}) zaprojektowano skrypt \texttt{04\_physics\_wind.py}, który empirycznie dowodzi opisanego zjawiska. Poprzez protokół wymiany komunikatów (MAVLink), skrypt komunikuje się bezpośrednio z układem logicznym filtra EKF. Wykorzystując programistyczny paradygmat asynchroniczności (dekorator funkcji w środowisku Python), skrypt nasłuchuje zdarzeń sieciowych i w czasie rzeczywistym udostępnia wyliczony wektor wiatru do analizy.
+
+\begin{lstlisting}[language=Python, caption=Nasłuchiwanie wiadomości MAVLink dotyczących estymacji wektora wiatru EKF]
+def main():
+    vehicle = connect('udp:127.0.0.1:14550', wait_ready=True)
+
+    # Inicjalizacja atrybutow bez uzycia niezalecanych zmiennych globalnych
+    vehicle.wind_speed = 0.0
+    vehicle.wind_direction = 0.0
+
+    # Dekorator asynchronicznie chwytajacy z sieci komunikaty 'WIND' autopilota
+    @vehicle.on_message('WIND')
+    def wind_listener(self, name, message):
+        """Callback zrzucajacy pakiety wiatrowe MAVLink prosto do instancji obiektu."""
+        self.wind_speed = message.speed
+        self.wind_direction = message.direction
+\end{lstlisting}
+
+Dzięki uruchomieniu powyższego skryptu na serwerze symulacyjnym, operator może wywołać w konsoli wymuszony strumień wiatru ($\ge 10$ m/s). Wyświetlana w terminalu tabela raportująca kąty Eulera oraz estymowany `wind\_speed` jednoznacznie demonstruje ewolucję pochylenia drona wraz ze wzrostem napływającego z filtra wektora siły oporu atmosferycznego.
