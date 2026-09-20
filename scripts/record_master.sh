@@ -6,10 +6,10 @@ cd "$(dirname "$0")/.."
 export PYTHONPATH=$(pwd)
 
 echo "Sprawdzanie zależności..."
-for cmd in Xvfb fluxbox wmctrl ffmpeg sim_vehicle.py python3 xterm; do
+for cmd in Xvfb fluxbox wmctrl ffmpeg sim_vehicle.py python3; do
     if ! command -v $cmd &> /dev/null; then
         echo "BŁĄD: Nie znaleziono polecenia '$cmd'."
-        echo "Zainstaluj je (np. sudo apt install xvfb fluxbox wmctrl ffmpeg xterm) lub upewnij się, że jest w PATH."
+        echo "Zainstaluj je (np. sudo apt install xvfb fluxbox wmctrl ffmpeg) lub upewnij się, że jest w PATH."
         exit 1
     fi
 done
@@ -42,8 +42,8 @@ for EXP in "${EXPERIMENTS[@]}"; do
     
     FILENAME=${EXP//./_}
 
-    # 1. Uruchom SITL i mapę (z jawnymi koordynatami) wewnątrz xterm by zapobiec zamykaniu strumienia stdin
-    xterm -e "sim_vehicle.py -v ArduCopter -f quad -l 51.1078,17.0385,120,0 --map" &
+    # 1. Uruchom SITL i mapę (z jawnymi koordynatami) z fałszywym terminalem (pty) by uniknąć problemów MAVProxy
+    python3 -c "import pty; pty.spawn(['sim_vehicle.py', '-v', 'ArduCopter', '-f', 'quad', '-l', '51.1078,17.0385,120,0', '--map'])" &
     SITL_PID=$!
     
     echo "Oczekiwanie na okno MAVProxy..."
@@ -81,9 +81,8 @@ for EXP in "${EXPERIMENTS[@]}"; do
     kill -SIGINT $FFMPEG_PID
     wait $FFMPEG_PID 2>/dev/null
 
-    # 6. Zamykamy SITL i xterm
+    # 6. Zamykamy SITL
     kill -9 $SITL_PID 2>/dev/null
-    killall -9 xterm 2>/dev/null
     sleep 2
 done
 
