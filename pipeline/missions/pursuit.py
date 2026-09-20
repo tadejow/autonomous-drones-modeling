@@ -40,16 +40,21 @@ class PursuitMission:
         self.vehicle.send_mavlink(msg)
 
     def run(self):
-        self.vehicle.groundspeed = 15.0
+        self.vehicle.groundspeed = 25.0 # Większa prędkość w locie Guided
         self.manager.arm_and_takeoff(10.0)
         
-        base_gps = self.vehicle.location.global_relative_frame
+        print("Czekam na stabilny sygnał GPS...")
+        while True:
+            base_gps = self.vehicle.location.global_relative_frame
+            if base_gps and base_gps.lat is not None:
+                break
+            time.sleep(1)
         
-        # Inicjalizacja celu - balon
-        tx, ty, tz = 150.0, 100.0, 30.0
-        tvx, tvy, tvz = 0.25, 1.0, -0.2 
+        # Inicjalizacja celu - balon (startuje dalej, żeby pościg trwał dłużej przy wyższej prędkości)
+        tx, ty, tz = 250.0, 180.0, 40.0
+        tvx, tvy, tvz = 0.5, 2.0, -0.2 
         
-        plotter = DronePlotter(title="Misja Pościgu - Balon", trail_length=150)
+        plotter = DronePlotter(title="Misja Pościgu - Zmutowany Balon", trail_length=200)
         plotter.set_view(elev=30, azim=45)
         
         last_time = time.time()
@@ -85,7 +90,7 @@ class PursuitMission:
                 break
                 
             # Prosty wektor do celu
-            speed = 15.0
+            speed = 25.0
             cmd_vx = (dist_x / real_distance) * speed
             cmd_vy = (dist_y / real_distance) * speed
             cmd_vz = -(dist_z / real_distance) * speed 
