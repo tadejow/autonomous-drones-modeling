@@ -20,7 +20,14 @@ Celem kursu jest wypełnienie luki pomiędzy teoretyczną analizą matematyczną
 
 ## 📂 Struktura repozytorium
 
-Projekt został podzielony na pięć modułów tematycznych o rosnącym stopniu skomplikowania. W każdym katalogu znajduje się osobny plik `README.md` z zaawansowaną analizą merytoryczną zastosowanej tam matematyki.
+Projekt dzieli się na dwie główne części: **Materiały Szkoleniowe (POC)** oraz docelową **Architekturę Pipeline**.
+
+### 1. Architektura `pipeline/` (Zalecana)
+Zintegrowany pakiet zgodny z wzorcami inżynierii oprogramowania. Znajdują się tu gotowe klasy do sterowania (VehicleManager), wizualizacji (DronePlotter) oraz skrypty zaawansowanych misji. Szczegóły znajdziesz w `pipeline/README.md`.
+Do szybkiego uruchamiania symulacji przygotowano katalog `scripts/` (np. `launch_single.sh`).
+
+### 2. Katalogi Edukacyjne POC (`01` - `05`)
+Początkowe skrypty edukacyjne wprowadzające pojęcia matematyczne i fizyczne w lotach autonomicznych. W każdym katalogu znajduje się osobny plik `README.md` z zaawansowaną analizą merytoryczną zastosowanej tam matematyki.
 
 *   `01_podstawy_ruchu/` – Inicjalizacja asynchronicznych pętli kontrolnych, start, lądowanie oraz podstawowa nawigacja po prostej trajektorii w układzie NED.
 *   `02_fizyka_i_matematyka/` – Przejście do ciągłego planowania lotu przy użyciu równań parametrycznych. Analiza wpływu surowej fizyki (wiatru, bezwładności) na zachowanie regulatorów PID i EKF.
