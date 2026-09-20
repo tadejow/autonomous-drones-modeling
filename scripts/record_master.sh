@@ -19,7 +19,7 @@ done
 mkdir -p nagrania
 
 echo "Czyszczenie środowiska (zamykanie starych okien)..."
-killall -9 sim_vehicle.py waf mavproxy.py xfce4-terminal python3 ffmpeg 2>/dev/null
+killall -9 sim_vehicle.py waf mavproxy.py python3 ffmpeg 2>/dev/null
 sleep 2
 
 # Pobranie faktycznej rozdzielczości Twojego pulpitu do nagrywania (np. 1920x1080)
