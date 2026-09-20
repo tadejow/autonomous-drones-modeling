@@ -1,0 +1,39 @@
+\section{Podstawy ruchu}
+
+\begin{frame}{Gdzie jestem? Układ współrzędnych w praktyce}
+    Zanim dron gdziekolwiek poleci, musi wiedzieć, gdzie jest. Pomaga mu w tym układ współrzędnych 3D (X, Y, Z).
+    
+    \vspace{0.5cm}
+    \begin{center}
+    \begin{tikzpicture}[scale=1.2]
+        % Osie
+        \draw[thick, ->] (0,0,0) -- (3,0,0) node[anchor=north east]{$X$ (Wschód)};
+        \draw[thick, ->] (0,0,0) -- (0,3,0) node[anchor=north west]{$Z$ (Wysokość)};
+        \draw[thick, ->] (0,0,0) -- (0,0,3) node[anchor=south]{$Y$ (Północ)};
+        
+        % Punkt drona
+        \filldraw[blue] (2, 2, 2) circle (2pt) node[anchor=west]{Dron $(x, y, z)$};
+        
+        % Linie pomocnicze
+        \draw[dashed, gray] (2,2,2) -- (2,0,2);
+        \draw[dashed, gray] (2,0,2) -- (2,0,0);
+        \draw[dashed, gray] (2,0,2) -- (0,0,2);
+    \end{tikzpicture}
+    \end{center}
+\end{frame}
+
+\begin{frame}{Start drona -- pierwszy kod}
+    Aby poderwać drona do lotu, podajemy mu docelowe koordynaty w przestrzeni. Zamiast joysticka wysyłamy komendę z docelowym punktem.
+    
+    \vspace{0.5cm}
+    \textbf{Demonstracja wideo:} Start i lot po prostej trajektorii.
+    
+    \begin{center}
+    % Zastąpić właściwym plikiem np. start_video.mp4
+    %\movie[width=0.6\textwidth, height=0.4\textwidth, poster]{Kliknij, by odtworzyć (Wymagany zewnętrzny odtwarzacz)}{start_video.mp4}
+    \begin{tikzpicture}
+        \draw[fill=gray!20] (0,0) rectangle (6,3);
+        \node at (3,1.5) {MIEJSCE NA WIDEO: Start i prosta trajektoria};
+    \end{tikzpicture}
+    \end{center}
+\end{frame}

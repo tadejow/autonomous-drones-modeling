@@ -1,0 +1,29 @@
+\section{Fizyka i matematyka lotu}
+
+\begin{frame}{Siły i Wektory - Wiatr jako wyzwanie}
+    W idealnym świecie drony latałyby po idealnie prostych liniach. W rzeczywistości przeszkadza im wiatr. Wiatr to z punktu widzenia matematyki nic innego jak \textbf{wektor}.
+    
+    \vspace{0.5cm}
+    \begin{center}
+    \begin{tikzpicture}[scale=1.5]
+        \draw[thick, ->, blue] (0,0) -- (2,1) node[midway, above left]{Prędkość drona $\vec{V_d}$};
+        \draw[thick, ->, red] (2,1) -- (3,0) node[midway, above right]{Wiatr $\vec{W}$};
+        \draw[thick, ->, dashed, green!50!black] (0,0) -- (3,0) node[midway, below]{Rzeczywisty tor lotu $\vec{V_{rz}}$};
+    \end{tikzpicture}
+    \end{center}
+    \vspace{0.2cm}
+    $\vec{V_{rz}} = \vec{V_d} + \vec{W}$. By utrzymać kurs, dron musi korygować swój lot.
+\end{frame}
+
+\begin{frame}{Trajektorie - krzywe parametryczne}
+    Do płynnego lotu, np. nagrywania kamerą obiektu w centrum, drony poruszają się po okręgach lub innych kształtach. Do ich opisania używamy równań krzywych.
+    
+    \vspace{0.3cm}
+    \textbf{Demonstracja wideo:} Lot po kształtach parametrycznych i pokonywanie wiatru.
+    \begin{center}
+    \begin{tikzpicture}
+        \draw[fill=gray!20] (0,0) rectangle (6,3);
+        \node at (3,1.5) {MIEJSCE NA WIDEO: Kształty i wiatr};
+    \end{tikzpicture}
+    \end{center}
+\end{frame}

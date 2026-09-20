@@ -1,0 +1,44 @@
+\documentclass[10pt, aspectratio=169]{beamer}
+
+% --- PAKIETY ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{amsmath, amsfonts, amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{multimedia} % Do osadzania wideo
+\usepackage{tikz}
+\usetikzlibrary{angles, quotes, calc, 3d, arrows.meta, positioning}
+
+% --- WYGLĄD PREZENTACJI ---
+\usetheme{UWr_white}
+% \usecolortheme{seahorse} % Usunięto ze względu na własny motyw
+% \setbeamertemplate{navigation symbols}{} % Znajduje się w motywie UWr
+
+% --- DANE TYTUŁOWE ---
+\title[Matematyka i Drony]{Matematyczne podstawy modelowania trajektorii lotu dronów}
+\subtitle{Od równań na tablicy do autonomicznej misji}
+\author{Maciej Tadej}
+\institute{Wydział Matematyki i Informatyki \\ Uniwersytet Wrocławski}
+\date{Dolnośląski Kongres Młodego Odkrywcy}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Plan prezentacji}
+    \tableofcontents
+\end{frame}
+
+% --- SEKCJE PREZENTACJI ---
+\input{sections/01_wstep.tex}
+\input{sections/02_podstawy.tex}
+\input{sections/03_fizyka.tex}
+\input{sections/04_misje.tex}
+\input{sections/05_roje.tex}
+\input{sections/06_podsumowanie.tex}
+
+\end{document}

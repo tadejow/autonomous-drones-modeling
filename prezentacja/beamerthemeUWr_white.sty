@@ -1,0 +1,278 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Theme created by Krzysztof Cach
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\mode<presentation>
+\usepackage{pgfcomp-version-0-65}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Color part
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Defining colors
+\definecolor{black}{rgb}{0,0,0}
+\definecolor{Descitem}{RGB}{0,0,139}
+
+\definecolor{StdTitle}{RGB}{26,33,141}
+\definecolor{StdBody}{RGB}{213,24,0}
+
+\definecolor{AlTitle}{RGB}{255,190,190}
+\definecolor{AlBody}{RGB}{213,24,0}
+
+\definecolor{uniBlue100}{RGB}{0,102,158}
+\definecolor{uniBlue90}{RGB}{25,117,168}
+\definecolor{uniBlue80}{RGB}{51,133,177}
+\definecolor{uniBlue60}{RGB}{102,163,197}
+\definecolor{uniWFA}{RGB}{97,191,26}
+
+\definecolor{smokedWhite}{RGB}{240,240,240}
+\definecolor{white}{RGB}{255,255,255}
+\definecolor{black}{RGB}{0,0,0}
+
+\definecolor{bg}{RGB}{0,102,158}
+
+% Colors for slide number
+\setbeamercolor{info}{fg=smokedWhite, bg=uniBlue100!60!black}
+
+% Bind colors for author 
+\setbeamercolor{author in head/foot}{fg=white, bg=uniBlue100!80!black}
+
+% Bind colors to titles
+\setbeamercolor{frametitle}{fg = black, bg=uniBlue100}
+\setbeamercolor{frametitle right}{fg = smokedWhite, bg=uniBlue100}
+\setbeamercolor{title}{fg = black, bg=uniBlue60}	
+\setbeamercolor{title in head/foot}{fg=smokedWhite, bg=uniBlue80!60!uniBlue100}
+
+% Table of contents/Outline slide bindings
+\setbeamercolor{section in toc}{fg = black}
+\setbeamercolor{section in toc shaded}{fg = black}
+\setbeamercolor{section in head/foot}{fg = white, bg=uniBlue80}
+\setbeamercolor{section in structure}{fg = white, bg=uniBlue80}
+
+\setbeamercolor{subsection in toc}{fg = black, bg=uniBlue90!80!white}
+\setbeamercolor{subsection in toc shaded}{fg = black, bg=uniBlue90!90!white}
+\setbeamercolor{subsection in head/foot}{fg=smokedWhite}
+\setbeamercolor{subsection in structure}{fg = smokedWhite}
+
+% Footer with structure color
+\setbeamercolor{structure}{bg=uniBlue90!80!black, fg=uniBlue100!90!smokedWhite}
+
+% Color of projected items
+\setbeamercolor{item projected}{fg=smokedWhite, bg=uniBlue90!70!uniBlue80}
+
+% Items/subitems/subsubitems 
+\setbeamercolor{itemize item}{fg = uniBlue100}
+\setbeamercolor{itemize subitem}{fg = uniBlue90}
+\setbeamercolor{itemize subsubitem}{fg = uniBlue80}
+
+% Enumerate items
+\setbeamercolor{enumerate item}{fg = black}
+\setbeamercolor{enumerate subitem}{fg = black}
+\setbeamercolor{enumerate subsubitem}{fg = black}
+
+% Description item
+\setbeamercolor{description item}{fg = black}
+
+% Caption colors
+\setbeamercolor{caption}{fg = black}
+\setbeamercolor{caption name}{fg = black}
+
+% Standard block
+\setbeamercolor{block title}{fg = white, bg = uniBlue90!70!black}
+\setbeamercolor{block body}{fg = black, bg = uniBlue60!60!smokedWhite}
+
+% Alert block
+\setbeamercolor{block title alerted}{bg = AlBody!90!black, fg = white}
+\setbeamercolor{block body alerted}{fg = black, bg = uniBlue80!60!white}
+
+% Example block
+\setbeamercolor{block title example}{fg = white, bg = uniWFA!65!black}
+\setbeamercolor{block body example}{fg = black, bg = uniBlue60!75!white}
+
+% Color of the text
+\setbeamercolor{normal text}{fg = black}
+
+% Color of colorBox
+\setbeamercolor{beamercolorboxColor}{bg = uniBlue80, fg = white}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Font part
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Default fonts
+%\usefonttheme{serif}
+
+% Font for the presentation title
+\setbeamerfont{title}{size = \huge}
+
+% Font of the frame titles
+\setbeamerfont{frametitle}{size = \Large}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Inner part
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Defining overall feel
+\useinnertheme{rectangles}
+
+% Defining items indicator
+\setbeamertemplate{itemize items}[triangle]
+
+% Enumerate indicator
+\setbeamertemplate{enumerate items}[default]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Outer part
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\useoutertheme{}
+
+% Declaring logo on main page
+\pgfdeclareimage[width=0.3\paperwidth]{big}{images/sygnetWhite}
+
+% Background color for slides
+\setbeamercolor{background canvas}{fg=smokedWhite}
+\setbeamersize{text margin left=1cm}
+
+% Title
+\newcommand{\MyTitle}{%
+	\centering \textbf{\Large {\inserttitle}}
+}
+
+% Subtitle
+\newcommand{\MySubTitle}{%
+	\centering \footnotesize \large{\insertsubtitle}
+}
+
+% Author
+\newcommand{\MyAuthor} {%
+	\vspace{3mm}
+	\centering \insertauthor
+}
+
+% Institute
+\newcommand{\MyInstitute}{%
+	\vspace{5mm}
+	\centering \footnotesize \insertinstitute
+}
+
+% Date
+\newcommand{\MyDate}{%
+	\centering \small \insertdate
+}
+
+\newcommand{\LogoUnderline}{%
+	\vspace{-1mm}
+	\begin{pgfpicture}{0mm}{0mm}{0mm}{0mm}
+		\pgfsetlinewidth{0.28mm}
+		\color{uniBlue100}
+		\pgfline{\pgfpoint{-3mm}{1mm}} {\pgfpoint{10.9cm}{1mm}}
+	\end{pgfpicture}
+}
+
+\newcommand{\LogoLine}{%
+	\raisebox{-1.2mm}[0pt][0pt]{%
+		\begin{pgfpicture}{0mm}{0mm}{0mm}{0mm}
+			\pgfsetlinewidth{1.5mm}
+			\color{uniWFA}
+			\pgfline{\pgfpoint{27mm}{1mm}} {\pgfpoint{16.8cm}{1mm}}
+		\end{pgfpicture}
+	}
+}
+
+\newcommand{\BackLine}{%
+		\begin{pgfpicture}{0mm}{0mm}{0mm}{0mm}
+			\pgfsetlinewidth{40mm}
+			\color{uniBlue90!75!uniBlue60}
+			\pgfline{\pgfpoint{-10.1mm}{1mm}} {\pgfpoint{15.8cm}{1mm}}
+		\end{pgfpicture}
+}
+
+\newcommand{\TitleLine}{%
+	\raisebox{-7mm}[0pt][0pt] {%
+		\begin{pgfpicture}{0mm}{0mm}{0mm}{0mm}
+			\pgfsetlinewidth{0.10mm}
+			\color{gray}
+			\pgfline{\pgfpoint{-55mm}{0mm}}{\pgfpoint{55mm}{50mm}}
+		\end{pgfpicture}
+	}
+}
+
+% Logo on left side panel
+\setbeamertemplate{sidebar canvas left}{
+	\vspace{-0.8cm}
+	\includegraphics[height=28pt]{images/logoWhite}
+}
+
+\setbeamertemplate{headline}{
+	\LogoLine
+	\vspace{0.8cm}
+}
+
+
+\setbeamertemplate{frametitle} {%
+	\vspace{-0.8cm}
+	\begin{columns}%
+	\column{0.13\textwidth}
+	\column{0.87\textwidth}
+		\insertframetitle
+\end{columns}\vspace{0.1cm}\LogoUnderline
+}
+
+% Footline 
+\setbeamertemplate{footline}{%
+	\leavevmode%
+	\hbox{%
+	\begin{beamercolorbox}[wd=.5\paperwidth, ht=2.5ex,dp=1.125ex]
+		{title in head/foot} %
+		\centering \tiny \insertshorttitle \hspace{.3cm}
+	\end{beamercolorbox}%
+	
+	\begin{beamercolorbox}[wd=.43\paperwidth, ht=2.5ex,dp=1.125ex]
+		{author in head/foot} %
+		\tiny \centering \insertauthor
+	\end{beamercolorbox}%
+	
+	\begin{beamercolorbox}[wd=.07\paperwidth,ht=2.5ex,dp=1.125ex,center]
+		{info}%
+		\centering\tiny \insertframenumber/\inserttotalframenumber
+	\end{beamercolorbox}%
+	}
+}
+
+% Navigation symbols -> disabled
+\setbeamertemplate{navigation symbols} {}
+
+% TITLE PAGE
+\setbeamertemplate{title page}{
+	\begin{columns}[c]
+		\column{0.4\textwidth}
+		\includegraphics[width=\textwidth]{images/sygnetWhite}
+	 	
+		\column{0.6\textwidth}
+			\begin{beamercolorbox}{Title}
+				\MyTitle
+			\end{beamercolorbox}
+			\begin{beamercolorbox}{Title}
+				\MySubTitle
+			\end{beamercolorbox}
+			
+			\vspace{8mm}
+			\begin{beamercolorbox}{Title}
+				\MyAuthor
+			\end{beamercolorbox}
+
+			\vspace{5mm}
+			\begin{beamercolorbox}{Title}
+				\MyInstitute
+			\end{beamercolorbox}
+
+			\vspace {10mm}
+			\begin{beamercolorbox}{Title}
+				\MyDate
+			\end{beamercolorbox}
+	\end{columns}
+}
+
+\mode
+<all>
