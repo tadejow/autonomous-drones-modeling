@@ -32,6 +32,18 @@ def run_physics_wind_demo(connection_string='udp:127.0.0.1:14550'):
     
     print("\nNagrywanie telemetrii...")
     for i in range(150): # Szybszy eksperyment, mniej klatek
+        
+        # Dynamiczna zmiana wiatru co kilkadziesiąt klatek
+        if i == 0:
+            print("[WIATR] Potężny podmuch ze Wschodu (270 st)!")
+            vehicle.parameters['SIM_WIND_DIR'] = 270.0
+        elif i == 50:
+            print("[WIATR] Zmiana wiatru! Wieje z Zachodu (90 st)!")
+            vehicle.parameters['SIM_WIND_DIR'] = 90.0
+        elif i == 100:
+            print("[WIATR] Porywisty boczny wiatr (135 st)!")
+            vehicle.parameters['SIM_WIND_DIR'] = 135.0
+
         loc = vehicle.location.local_frame
         if loc.north is not None:
             # Pozycja XYZ

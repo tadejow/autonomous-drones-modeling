@@ -96,8 +96,10 @@ for EXP in "${EXPERIMENTS[@]}"; do
 
     # 6. Zamykamy symulator terminala (co zabije też sim_vehicle.py)
     kill -9 $XFCE_PID 2>/dev/null
-    killall -9 sim_vehicle.py waf mavproxy.py 2>/dev/null
-    sleep 2
+    killall -9 sim_vehicle.py waf mavproxy.py python3 2>/dev/null
+    
+    echo "Zakończono. Przerwa na posprzątanie okien przed następnym startem..."
+    sleep 5
 done
 
 echo "Wszystkie eksperymenty zostały nagrane prosto z Twojego ekranu i zapisane w katalogu 'nagrania/'!"
