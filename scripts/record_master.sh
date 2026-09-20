@@ -42,8 +42,8 @@ for EXP in "${EXPERIMENTS[@]}"; do
     
     FILENAME=${EXP//./_}
 
-    # 1. Uruchom SITL i mapę (z jawnymi koordynatami zamiast Geocodera -L Wroclaw)
-    sim_vehicle.py -v ArduCopter -f quad -l 51.1078,17.0385,120,0 --map &
+    # 1. Uruchom SITL i mapę (z jawnymi koordynatami) wewnątrz xterm by zapobiec zamykaniu strumienia stdin
+    xterm -e "sim_vehicle.py -v ArduCopter -f quad -l 51.1078,17.0385,120,0 --map" &
     SITL_PID=$!
     
     echo "Oczekiwanie na okno MAVProxy..."
