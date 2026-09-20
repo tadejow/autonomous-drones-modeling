@@ -6,10 +6,10 @@ cd "$(dirname "$0")/.."
 export PYTHONPATH=$(pwd)
 
 echo "Sprawdzanie zależności..."
-for cmd in Xvfb wmctrl ffmpeg sim_vehicle.py python3; do
+for cmd in Xvfb fluxbox wmctrl ffmpeg sim_vehicle.py python3; do
     if ! command -v $cmd &> /dev/null; then
         echo "BŁĄD: Nie znaleziono polecenia '$cmd'."
-        echo "Zainstaluj je (np. sudo apt install xvfb wmctrl ffmpeg) lub upewnij się, że jest w PATH (np. sim_vehicle.py)."
+        echo "Zainstaluj je (np. sudo apt install xvfb fluxbox wmctrl ffmpeg) lub upewnij się, że jest w PATH."
         exit 1
     fi
 done
@@ -24,6 +24,11 @@ Xvfb :99 -screen 0 1920x1080x24 &
 XVFB_PID=$!
 sleep 2 # Czekamy na start serwera X
 
+# Uruchamiamy prosty menedżer okien, aby wmctrl miał czym zarządzać
+fluxbox -display :99 &
+FLUXBOX_PID=$!
+sleep 1
+
 EXPERIMENTS=(
     "pipeline.missions.physics_demo"
     "pipeline.missions.pursuit"
@@ -37,8 +42,8 @@ for EXP in "${EXPERIMENTS[@]}"; do
     
     FILENAME=${EXP//./_}
 
-    # 1. Uruchom SITL i mapę
-    sim_vehicle.py -v ArduCopter -f quad -L Wroclaw --map &
+    # 1. Uruchom SITL i mapę (z jawnymi koordynatami zamiast Geocodera -L Wroclaw)
+    sim_vehicle.py -v ArduCopter -f quad -l 51.1078,17.0385,120,0 --map &
     SITL_PID=$!
     
     echo "Oczekiwanie na okno MAVProxy..."
@@ -68,6 +73,7 @@ for EXP in "${EXPERIMENTS[@]}"; do
     sleep 2
 done
 
-# Sprzątanie Xvfb
+# Sprzątanie Xvfb i WM
+kill -9 $FLUXBOX_PID 2>/dev/null
 kill -9 $XVFB_PID 2>/dev/null
 echo "Wszystkie eksperymenty zostały nagrane i zapisane w katalogu 'nagrania/'!"
