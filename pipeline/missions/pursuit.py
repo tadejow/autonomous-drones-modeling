@@ -104,5 +104,12 @@ class PursuitMission:
         plotter.close()
 
 if __name__ == "__main__":
-    mission = PursuitMission()
-    mission.run()
+    try:
+        mission = PursuitMission()
+        mission.run()
+    except Exception as e:
+        import traceback
+        with open("crash.log", "w") as f:
+            f.write("Błąd w pursuit.py:\n")
+            f.write(traceback.format_exc())
+        print(f"CRASH! Błąd zapisany do crash.log: {e}")
