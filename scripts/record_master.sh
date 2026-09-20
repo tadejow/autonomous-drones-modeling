@@ -37,7 +37,7 @@ HEIGHT=$(echo $RESOLUTION | cut -d'x' -f2)
 
 EXPERIMENTS=(
     "pipeline.missions.physics_demo"
-    "pipeline.missions.pursuit"
+    "pipeline.missions.heart_trajectory"
     "pipeline.missions.search_rescue"
 )
 
