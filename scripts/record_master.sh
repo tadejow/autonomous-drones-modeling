@@ -6,10 +6,10 @@ cd "$(dirname "$0")/.."
 export PYTHONPATH=$(pwd)
 
 echo "Sprawdzanie zależności..."
-for cmd in Xvfb fluxbox wmctrl ffmpeg sim_vehicle.py python3; do
+for cmd in Xvfb fluxbox wmctrl ffmpeg sim_vehicle.py python3 xterm; do
     if ! command -v $cmd &> /dev/null; then
         echo "BŁĄD: Nie znaleziono polecenia '$cmd'."
-        echo "Zainstaluj je (np. sudo apt install xvfb fluxbox wmctrl ffmpeg) lub upewnij się, że jest w PATH."
+        echo "Zainstaluj je (np. sudo apt install xvfb fluxbox wmctrl ffmpeg xterm) lub upewnij się, że jest w PATH."
         exit 1
     fi
 done
@@ -47,8 +47,14 @@ for EXP in "${EXPERIMENTS[@]}"; do
     SITL_PID=$!
     
     echo "Oczekiwanie na okno MAVProxy..."
-    sleep 10 
-    wmctrl -r "MAVProxy" -e 0,0,0,960,1080 || echo "Nie znaleziono okna MAVProxy, kontynuuję..."
+    for i in {1..45}; do
+        if wmctrl -l | grep -q "MAVProxy"; then
+            wmctrl -r "MAVProxy" -e 0,0,0,960,1080
+            echo "Znaleziono i ustawiono MAVProxy."
+            break
+        fi
+        sleep 1
+    done
 
     # 2. Uruchom nagrywanie ekranu
     ffmpeg -y -video_size 1920x1080 -framerate 30 -f x11grab -i :99.0 -c:v libx264 -preset fast -pix_fmt yuv420p "nagrania/${FILENAME}.mp4" < /dev/null > /dev/null 2>&1 &
@@ -58,8 +64,15 @@ for EXP in "${EXPERIMENTS[@]}"; do
     python3 -m $EXP &
     PY_PID=$!
     
-    sleep 5
-    wmctrl -r "Figure 1" -e 0,960,0,960,1080 || echo "Nie znaleziono okna Matplotlib."
+    echo "Oczekiwanie na okno Matplotlib..."
+    for i in {1..30}; do
+        if wmctrl -l | grep -q "Figure 1"; then
+            wmctrl -r "Figure 1" -e 0,960,0,960,1080
+            echo "Znaleziono i ustawiono okno Matplotlib."
+            break
+        fi
+        sleep 1
+    done
 
     # 4. Czekamy na zakończenie skryptu Pythona
     wait $PY_PID
@@ -68,8 +81,9 @@ for EXP in "${EXPERIMENTS[@]}"; do
     kill -SIGINT $FFMPEG_PID
     wait $FFMPEG_PID 2>/dev/null
 
-    # 6. Zamykamy SITL
+    # 6. Zamykamy SITL i xterm
     kill -9 $SITL_PID 2>/dev/null
+    killall -9 xterm 2>/dev/null
     sleep 2
 done
 
