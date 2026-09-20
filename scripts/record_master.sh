@@ -41,9 +41,9 @@ for EXP in "${EXPERIMENTS[@]}"; do
     FILENAME=${EXP//./_}
 
     # 1. Uruchomienie z naturalnego katalogu ArduPilota (bez pty i Xvfb!)
-    # Wstrzykujemy aktywację środowiska i ścieżki wewnątrz nowego okna!
+    # Wstrzykujemy aktywację środowiska i ścieżki wewnątrz nowego okna! (--disable-server izoluje proces, byśmy mogli go ubić na końcu)
     cd $HOME/ardupilot/ArduCopter
-    xfce4-terminal -e "bash -c 'source $HOME/venv-ardupilot/bin/activate; export PATH=\$PATH:\$HOME/ardupilot/Tools/autotest; sim_vehicle.py -f quad -l 51.1078,17.0385,120,0 --map; read'" &
+    xfce4-terminal --disable-server -e "bash -c 'source $HOME/venv-ardupilot/bin/activate; export PATH=\$PATH:\$HOME/ardupilot/Tools/autotest; sim_vehicle.py -f quad -l 51.1078,17.0385,120,0 --map; read'" &
     XFCE_PID=$!
     
     echo "Oczekiwanie na okno MAVProxy..."
@@ -88,6 +88,7 @@ for EXP in "${EXPERIMENTS[@]}"; do
 
     # 6. Zamykamy symulator terminala (co zabije też sim_vehicle.py)
     kill -9 $XFCE_PID 2>/dev/null
+    killall -9 sim_vehicle.py waf mavproxy.py 2>/dev/null
     sleep 2
 done
 
