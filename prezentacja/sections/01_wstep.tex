@@ -65,3 +65,39 @@
     \vspace{0.5cm}
     \textbf{Odpowiedzią na te pytania jest matematyka.} Pojęcia z lekcji matematyki i fizyki stają się potężnymi narzędziami, z których korzystają współczesne technologie.
 \end{frame}
+
+\begin{frame}{Inżynieria lotu -- Jak drony komunikują się ze światem?}
+    Za autonomią stoi skomplikowany, ale bardzo uporządkowany proces komunikacji. 
+    Drony porozumiewają się ze stacją naziemną (GCS) za pomocą protokołu \textbf{MAVLink}.
+    
+    \vspace{0.4cm}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.9, transform shape,
+        box/.style={draw, rounded corners, fill=blue!10, text width=3cm, align=center, minimum height=1.2cm},
+        arrow/.style={->, thick, >=stealth}]
+        
+        % Komponenty
+        \node[box, fill=green!20] (gcs) at (0, 0) {\textbf{Stacja Bazowa (GCS)} \\ \footnotesize QGroundControl \\ Mission Planner};
+        \node[box, fill=orange!20] (mavlink) at (5, 0) {\textbf{Protokół MAVLink} \\ \footnotesize Telemetria, Komendy};
+        \node[box, fill=gray!20] (drone) at (10, 0) {\textbf{Kontroler Lotu} \\ \footnotesize ArduPilot (SITL) \\ Pixhawk};
+        
+        % Strzałki komunikacji
+        \draw[arrow, bend left=15] (gcs.east) to node[above, font=\footnotesize]{SET\_MODE (GUIDED)} (mavlink.west);
+        \draw[arrow, bend left=15] (mavlink.east) to node[above, font=\footnotesize]{ARM (Uzbrojenie)} (drone.west);
+        
+        \draw[arrow, bend left=15] (drone.south west) to node[below, font=\footnotesize]{GPS, Attitude (Pitch/Roll)} (mavlink.south east);
+        \draw[arrow, bend left=15] (mavlink.south west) to node[below, font=\footnotesize]{HEARTBEAT (Status)} (gcs.south east);
+        
+        % Proces Pre-Arm
+        \node[draw, dashed, fill=yellow!10, text width=4cm, align=left] at (10, -2.5) {
+            \textbf{Pre-Arm Checks:}\\
+            1. GPS Lock (3D Fix)\\
+            2. IMU Calibration\\
+            3. Barometer OK\\
+            4. Bateria > 20\%
+        };
+        \draw[->, dashed, thick] (10, -1.2) -- (10, -0.6);
+        
+    \end{tikzpicture}
+    \end{center}
+\end{frame}
