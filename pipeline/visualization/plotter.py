@@ -55,7 +55,7 @@ class DronePlotter:
         all_z = list(self.history_z) + (list(self.target_z) if target_pos else [])
         
         if len(all_x) > 0:
-            margin = 5
+            margin = 2 # Mniejszy margines, żeby mocniej przybliżyć (zoom) na trajektorię
             self.ax.set_xlim([min(all_x)-margin, max(all_x)+margin])
             self.ax.set_ylim([min(all_y)-margin, max(all_y)+margin])
             self.ax.set_zlim([0, max(all_z)+margin if max(all_z) > 10 else 20])
