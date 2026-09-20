@@ -15,12 +15,15 @@ class VehicleManager:
         """
         Zbroi drona i startuje na docelową wysokość.
         """
-        # --- Zmiana wirtualnej baterii na 40% ---
-        # Dla pakietu 3S LiPo (12.6V max, 10.5V min), napięcie ~11.3V odpowiada około 40% baterii.
+        # --- Zmiana wirtualnej baterii na 40% i wyłączenie awaryjnego lądowania ---
         try:
-            self.vehicle.parameters['SIM_BATT_VOLTAGE'] = 11.3
+            # 11.5V spanie do ok. 40% po włączeniu silników (spadek napięcia)
+            self.vehicle.parameters['SIM_BATT_VOLTAGE'] = 11.5 
+            # Wyłączenie RTL (Return To Launch) przy niskim poziomie baterii (0 = Disabled)
+            self.vehicle.parameters['BATT_FS_LOW_ACT'] = 0
+            self.vehicle.parameters['BATT_FS_CRT_ACT'] = 0
         except Exception:
-            pass # Jeśli parametr nie istnieje w tej wersji SITL, ignorujemy
+            pass # Ignorujemy jeśli parametr nie istnieje
             
         # Maksymalizacja prędkości nawigacyjnej
         self.vehicle.parameters['WPNAV_SPEED'] = 2000.0   # 20 m/s poziomo
