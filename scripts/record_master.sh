@@ -41,9 +41,9 @@ for EXP in "${EXPERIMENTS[@]}"; do
     FILENAME=${EXP//./_}
 
     # 1. Uruchomienie z naturalnego katalogu ArduPilota (bez pty i Xvfb!)
-    # Odpalamy w xfce4-terminal (którego używasz na serwerze), aby proces zachował się tak jak podczas ręcznego testu!
+    # Wstrzykujemy aktywację środowiska i ścieżki wewnątrz nowego okna!
     cd $HOME/ardupilot/ArduCopter
-    xfce4-terminal -e "bash -c 'sim_vehicle.py -f quad -l 51.1078,17.0385,120,0 --map; read'" &
+    xfce4-terminal -e "bash -c 'source $HOME/venv-ardupilot/bin/activate; export PATH=\$PATH:\$HOME/ardupilot/Tools/autotest; sim_vehicle.py -f quad -l 51.1078,17.0385,120,0 --map; read'" &
     XFCE_PID=$!
     
     echo "Oczekiwanie na okno MAVProxy..."
