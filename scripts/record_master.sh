@@ -7,6 +7,10 @@ cd "$(dirname "$0")/.."
 export PYTHONPATH=$(pwd)
 PROJECT_DIR=$(pwd)
 
+# Automatyczna aktywacja środowiska ArduPilota i wgranie narzędzi do PATH
+source $HOME/venv-ardupilot/bin/activate 2>/dev/null || echo "Brak venv-ardupilot w \$HOME, używam globalnego Pythona"
+export PATH=$PATH:$HOME/ardupilot/Tools/autotest
+
 echo "Sprawdzanie zależności..."
 for cmd in wmctrl ffmpeg sim_vehicle.py python3 xdpyinfo; do
     if ! command -v $cmd &> /dev/null; then
