@@ -1,0 +1,26 @@
+Opis projektu:
+
+Bezzałogowe Statki Powietrzne (BSP, potocznie drony) są coraz częściej używane w różnorodnych dziedzinach życia. Zaczynając od oczywistego wykorzystania militarnego, BSP wykorzystywane są również przez służby ratunkowe do zadań takich jak monitorowanie zanieczyszczeń, pożarów, poszukiwanie zaginionych. Ponadto BSP wykorzystuje się również do wykonywania pomiarów z lotu ptaka oraz wielu innych zastosowań. Oczywistym staje się fakt, że coraz większą wagę ma kształcenie ekspertów w zakresie ich efektywnego i bezpiecznego wykorzystywania.
+
+Wiele prywatnych firm prowadzi już kursy manualnego sterowania BSP. My proponujemy „Kurs programowania trajektorii lotu dronów” przeznaczony dla studentów Wydziału Matematyki i Informatyki Uniwersytetu Wrocławskiego. Projekt ten stanowi odpowiedź na rosnące zapotrzebowanie na specjalistów potrafiących nie tylko obsługiwać urządzenia, ale przede wszystkim programować systemy autonomiczne. Kurs ma być pierwszym krokiem w stronę systematycznego zaangażowania studentów (szczególnie z Koła Naukowego Zastosowań Matematyki) w zaawansowane, długoterminowe projekty z zakresu robotyki (np. wkład w rozwój otwarto źródłowego oprogramowania Dronekit, czy też stworzenie własnej chmary dronów do pokazów świetlnych). Nasz kurs (15 spotkań po 2 godziny) docelowo będzie się składał z maksymalnie 5 spotkań w formie wykładu, w trakcie których studenci poznają podstawy fizyki, wymagane do zrozumienia zagadnienia. Minimum 10 spotkań odbędzie się w formule warsztatowej, na których skupimy się na zrozumieniu aspektów technicznych i praktycznych. Program kursu składa się z następujących zagadnień:
+
+kinematyka i dynamika lotu, 
+orientacja w przestrzeni, 
+podstawy teorii sterowania i algorytmiczne planowanie trajektorii
+architektura BSP - szczególnie środowisko ArduPilot, protokół komunikacyjny MAVLink oraz biblioteka DroneKit
+wirtualne środowiska testowe do symulacji komputerowych (SITL) oraz narzędzie Mission Planner do wizualizacji misji
+
+Wykorzystamy zaawansowane środowisko symulacyjne (Software-In-The-Loop, SITL), co pozwala na bezpieczne testowanie algorytmów sterujących BSP bez ryzyka uszkodzenia sprzętu, a nawet bez konieczności jego fizycznego posiadania. Metodyka opiera się na wykorzystaniu oprogramowania otwarto źródłowego (DroneKit, ArduPilot). Jest to rozwiązanie sprawdzone, przetestowane, darmowe i uznawane za state-of-the-art w dziedzinie autonomicznych BSP. Kurs łączy teorię sterowania z praktyczną implementacją w języku Python. Wybór tego języka jest kluczowy, gdyż jest on standardem nauczania na WMI, co znacząco obniża barierę wejścia dla studentów i pozwala skupić się na merytoryce projektu. Ponadto, skuteczne sterowanie dronem wymaga znajomości podstaw fizyki lotu i dynamiki układu, co zostanie szczegółowo objaśnione w części teoretycznej kursu, stanowiąc fundament pod zadania praktyczne.
+
+Projekt wypełnia lukę pomiędzy teoretycznym wykształceniem studentów WMI, a praktycznym zastosowaniem tej wiedzy w rozwiązywaniu złożonych, rzeczywistych problemów technologicznych. Wykorzystanie specjalistycznego oprogramowania pozwoli na bezpieczne symulowanie misji o wysokim stopniu skomplikowania, takich jak:
+
+śledzenie obiektów na ziemi w czasie rzeczywistym,
+optymalizacja zadań logistycznych,
+koordynacja lotu wielu dronów naraz.
+
+Realizacja kursu zaspokaja również potrzebę umiędzynarodowienia procesu kształcenia. Prowadzenie zajęć w całości w języku angielskim usuwa bariery uczestnictwa dla studentów-cudzoziemców. Jednocześnie studenci polscy zyskują cenną okazję do doskonalenia znajomości języka angielskiego w profesjonalnym, technicznym kontekście, co jest kluczowe dla ich dalszego rozwoju zawodowego.
+
+Beneficjentami projektu będzie grupa 15 studentów Wydziału Matematyki i Informatyki. Dzięki prowadzeniu zajęć w języku angielskim, projekt jest w pełni otwarty dla studentów-cudzoziemców. Szczególne miejsce w grupie przewidziano dla członków Koła Naukowego Zastosowań Matematyki, co zapewni trwałość inicjatywy po zakończeniu kursu.
+
+Wsparcie finansowe umożliwi przygotowanie wysokiej jakości materiałów dydaktycznych (starannie przygotowany skrypt z wyselekcjonowaną teorią, listy zadań domowych, notatniki Jupyter Notebook na podstawie których będą prowadzone zajęcia praktyczne) oraz wynagrodzenie za prowadzenie zajęć.
+

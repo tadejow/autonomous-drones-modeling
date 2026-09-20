@@ -1,0 +1,4 @@
+10:10–11:00
+Wykład: Matematyczne podstawy modelowania trajektorii lotu dronów (Maciej Tadej)
+
+Kiedy myślimy o dronach, najczęściej wyobrażamy sobie operatora z kontrolerem w dłoniach. Jednak w nowoczesnym przemyśle, logistyce czy ratownictwie prawdziwa inżynieria zaczyna się tam, gdzie kończy się ręczne sterowanie, a maszyna staje się w pełni autonomiczna. Jak sprawić, by statek powietrzny sam "wiedział", jak zrealizować misję, ominąć przeszkody i wrócić do bazy? Odpowiedzią jest połączenie matematyki z programowaniem. Podczas wykładu zajrzymy „pod maskę” systemów sterujących bezzałogowymi statkami powietrznymi. Oprzemy się na działających symulacjach komputerowych, by udowodnić, że pojęcia z lekcji matematyki czy fizyki to w rzeczywistości potężne narzędzia do rozwiązywania problemów technologicznych.
