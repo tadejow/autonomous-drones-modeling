@@ -8,17 +8,34 @@
     \begin{columns}
         \column{0.4\textwidth}
         \begin{center}
-        \begin{tikzpicture}[node distance=1.5cm, every node/.style={circle, draw, minimum size=0.5cm}]
-            \node (1) at (0,0) {A};
-            \node (2) [above right of=1] {B};
-            \node (3) [below right of=2] {C};
-            \node (4) [below right of=1] {D};
+        \begin{tikzpicture}[scale=0.9, every node/.style={circle, draw, minimum size=0.4cm, inner sep=1pt, font=\scriptsize}]
+            \node[fill=blue!20] (S) at (0, 0) {S};
+            \node (1) at (-1, 1.5) {1};
+            \node (2) at (1.5, 1.5) {2};
+            \node (3) at (2.5, 0.5) {3};
+            \node (4) at (1.2, 0.2) {4};
+            \node (5) at (2, -1.5) {5};
+            \node (6) at (0, -1.5) {6};
+            \node (7) at (-1.5, -0.5) {7};
             
-            \path[->, thick, blue]
-                (1) edge (2)
-                (2) edge (3)
-                (3) edge (4)
-                (4) edge (1);
+            % Tło - możliwe, ale nieoptymalne ścieżki (żeby wyglądało jak prawdziwy problem grafowy)
+            \begin{scope}[gray!40, dashed, very thin]
+                \draw (S) -- (2); \draw (S) -- (3); \draw (S) -- (4); \draw (S) -- (5);
+                \draw (1) -- (4); \draw (1) -- (7); \draw (1) -- (6);
+                \draw (2) -- (5); \draw (2) -- (6); \draw (2) -- (7);
+                \draw (3) -- (6); \draw (3) -- (7); \draw (4) -- (6);
+                \draw (4) -- (7); \draw (5) -- (7);
+            \end{scope}
+            
+            % Optymalna trasa (bez krzyżowania się, bo to metryka euklidesowa)
+            \draw[->, thick, blue] (S) -- (1);
+            \draw[->, thick, blue] (1) -- (2);
+            \draw[->, thick, blue] (2) -- (4);
+            \draw[->, thick, blue] (4) -- (3);
+            \draw[->, thick, blue] (3) -- (5);
+            \draw[->, thick, blue] (5) -- (6);
+            \draw[->, thick, blue] (6) -- (7);
+            \draw[->, thick, blue] (7) -- (S);
         \end{tikzpicture}
         \end{center}
         
