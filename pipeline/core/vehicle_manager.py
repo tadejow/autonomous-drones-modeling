@@ -16,9 +16,9 @@ class VehicleManager:
         Zbroi drona i startuje na docelową wysokość.
         """
         # Maksymalizacja prędkości nawigacyjnej
-        self.vehicle.parameters['WPNAV_SPEED'] = 2500.0   # 25 m/s poziomo
-        self.vehicle.parameters['WPNAV_SPEED_UP'] = 1000.0 # 10 m/s do góry
-        self.vehicle.parameters['WPNAV_SPEED_DN'] = 700.0  # 7 m/s w dół
+        self.vehicle.parameters['WPNAV_SPEED'] = 2000.0   # 20 m/s poziomo
+        self.vehicle.parameters['WPNAV_SPEED_UP'] = 500.0 # 5 m/s do góry
+        self.vehicle.parameters['WPNAV_SPEED_DN'] = 300.0  # 3 m/s w dół
         print("Basic pre-arm checks")
         while not self.vehicle.is_armable:
             print(" Waiting for vehicle to initialise...")

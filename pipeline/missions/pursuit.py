@@ -40,8 +40,8 @@ class PursuitMission:
         self.vehicle.send_mavlink(msg)
 
     def run(self):
-        self.vehicle.groundspeed = 25.0 # Większa prędkość w locie Guided
         self.manager.arm_and_takeoff(10.0)
+        self.vehicle.groundspeed = 20.0 # Większa prędkość w locie Guided
         
         print("Czekam na stabilny sygnał GPS...")
         while True:
