@@ -23,34 +23,47 @@
     \vspace{0.5cm}
     
     \begin{center}
-    \begin{tikzpicture}[scale=0.8]
-        % Ramiona drona
-        \draw[line width=3pt, gray!80] (-2,-2) -- (2,2);
-        \draw[line width=3pt, gray!80] (-2,2) -- (2,-2);
+    \begin{tikzpicture}[x=(-150:1cm), y=(0:1cm), z=(90:1cm), scale=1.8]
         
-        % Korpus
-        \filldraw[blue!70!black] (0,0) circle (0.8cm) node[white, font=\bfseries] {DRON};
+        % Środek ciężkości (CoG)
+        \coordinate (O) at (0,0,0);
+        \filldraw[black] (O) circle (1.5pt) node[above right, xshift=2mm, font=\scriptsize] {Środek Masy (CoG)};
+
+        % Ramiona drona (Konfiguracja X)
+        \draw[line width=1.5pt, gray!80, line cap=round] (-1,-1,0) -- (1,1,0);
+        \draw[line width=1.5pt, gray!80, line cap=round] (-1,1,0) -- (1,-1,0);
         
-        % Wirniki (z zaznaczeniem kierunku obrotu)
-        % Górny lewy - CW
-        \filldraw[gray!30, draw=black, thick] (-2,2) ellipse (1cm and 0.3cm);
-        \draw[->, thick, red] (-2, 2.5) arc (90:-90:0.5cm and 0.2cm);
+        % Silniki i Śmigła (Rysowanie płaskich okręgów w płaszczyźnie XY)
+        \begin{scope}[canvas is xy plane at z=0]
+            \foreach \x/\y/\n/\dir in {-1/-1/1/CW, -1/1/2/CCW, 1/1/3/CW, 1/-1/4/CCW} {
+                \filldraw[darkgray] (\x,\y) circle (0.15); % Silnik
+                \draw[thick, dashed] (\x,\y) circle (0.5); % Zasięg śmigła
+                \node[below, fill=white, inner sep=1pt, yshift=-3mm, font=\tiny] at (\x,\y) {$M_\n$ (\dir)};
+            }
+        \end{scope}
+
+        % Osie Body Frame (Wydłużone)
+        \draw[->, >=stealth, line width=1.2pt, red] (O) -- (2.0,0,0) node[right, xshift=2mm, font=\footnotesize] {$X_B$ (Przód)};
+        \draw[->, >=stealth, line width=1.2pt, green!60!black] (O) -- (0,2.0,0) node[right, xshift=2mm, font=\footnotesize] {$Y_B$ (Prawa strona)};
+        \draw[->, >=stealth, line width=1.2pt, blue] (O) -- (0,0,-2.0) node[below, yshift=-2mm, font=\footnotesize] {$Z_B$ (Dół)};
+
+        % --- Kąty Eulera z użyciem płaszczyzn 3D ---
         
-        % Górny prawy - CCW
-        \filldraw[gray!30, draw=black, thick] (2,2) ellipse (1cm and 0.3cm);
-        \draw[->, thick, green!70!black] (2, 2.5) arc (90:270:0.5cm and 0.2cm);
-        
-        % Dolny lewy - CCW
-        \filldraw[gray!30, draw=black, thick] (-2,-2) ellipse (1cm and 0.3cm);
-        \draw[->, thick, green!70!black] (-2, -1.5) arc (90:270:0.5cm and 0.2cm);
-        
-        % Dolny prawy - CW
-        \filldraw[gray!30, draw=black, thick] (2,-2) ellipse (1cm and 0.3cm);
-        \draw[->, thick, red] (2, -1.5) arc (90:-90:0.5cm and 0.2cm);
-        
-        % Oznaczenia
-        \node[red] at (-2, 3) {Kierunek 1};
-        \node[green!70!black] at (2, 3) {Kierunek 2};
+        % Roll (Obrót wokół osi X_B -> Leży w płaszczyźnie YZ)
+        \begin{scope}[canvas is yz plane at x=1.5]
+            \draw[->, >=stealth, red, thick] (0.4, 0) arc (0:270:0.4) node[midway, right, font=\footnotesize] {Przechylenie / Roll ($\phi$)};
+        \end{scope}
+
+        % Pitch (Obrót wokół osi Y_B -> Leży w płaszczyźnie XZ)
+        \begin{scope}[canvas is xz plane at y=1.5]
+            \draw[->, >=stealth, green!60!black, thick] (0.4, 0) arc (0:-270:0.4) node[midway, below, font=\footnotesize] {Pochylenie / Pitch ($\theta$)};
+        \end{scope}
+
+        % Yaw (Obrót wokół osi Z_B -> Leży w płaszczyźnie XY)
+        \begin{scope}[canvas is xy plane at z=-1.5]
+            \draw[->, >=stealth, blue, thick] (0.4, 0) arc (0:-270:0.4) node[midway, right, font=\footnotesize] {Odchylenie / Yaw ($\psi$)};
+        \end{scope}
+
     \end{tikzpicture}
     \end{center}
 \end{frame}
