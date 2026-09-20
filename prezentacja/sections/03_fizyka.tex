@@ -19,11 +19,31 @@
     Do płynnego lotu, np. nagrywania kamerą obiektu w centrum, drony poruszają się po okręgach lub innych kształtach. Do ich opisania używamy równań krzywych.
     
     \vspace{0.3cm}
-    \textbf{Demonstracja wideo:} Lot po kształtach parametrycznych i pokonywanie wiatru.
-    \begin{center}
-    \begin{tikzpicture}
-        \draw[fill=gray!20] (0,0) rectangle (6,3);
-        \node at (3,1.5) {MIEJSCE NA WIDEO: Kształty i wiatr};
-    \end{tikzpicture}
-    \end{center}
+    \textbf{Przykład - Lot po krzywej w kształcie serca:}
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \small
+            Używamy równań parametrycznych (zmienna $t$ od $0$ do $2\pi$):
+            \begin{align*}
+                x(t) &= 16 \sin^3(t) \\
+                y(t) &= 13 \cos(t) - 5 \cos(2t) \\
+                     &\quad - 2 \cos(3t) - \cos(4t)
+            \end{align*}
+            Komputer pokładowy dzieli tę krzywą na mniejsze odcinki i wysyła je jako kolejne współrzędne (waypointy) w formacie geograficznym (LAT/LON).
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \begin{center}
+            \begin{tikzpicture}[scale=0.15]
+                \draw[gray!30, thin, step=5] (-20,-20) grid (20,15);
+                \draw[->] (-20,0) -- (20,0) node[right]{$x$};
+                \draw[->] (0,-20) -- (0,15) node[above]{$y$};
+                
+                \draw[thick, red, domain=0:2*pi, samples=100, variable=\t] 
+                    plot ({16*sin(\t r)^3}, {13*cos(\t r) - 5*cos(2*\t r) - 2*cos(3*\t r) - cos(4*\t r)});
+                
+                \node[blue, font=\tiny] at (16, 5) {$\bullet$ Dron};
+            \end{tikzpicture}
+            \end{center}
+        \end{column}
+    \end{columns}
 \end{frame}
