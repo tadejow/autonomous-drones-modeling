@@ -590,34 +590,74 @@ Aby w pełni zdefiniować stan bryły sztywnej w przestrzeni trójwymiarowej $\m
 
 \subsection{Równania ruchu Newtona-Eulera i Tensor Bezwładności}
 
-Ruch drona opisuje się za pomocą dwóch nierozerwalnie połączonych układów odniesienia. Pierwszym jest układ inercjalny $\mathcal{I}$ (związany z Ziemią, np. układ NED). Drugim jest zilustrowany na Rysunku \ref{fig:rigid_body} \textbf{układ związany z ciałem $\mathcal{B} = \{O_B; \mathbf{i}_B, \mathbf{j}_B, \mathbf{k}_B\}$} (ang. \textit{Body Frame}), którego środek $O_B$ pokrywa się ze środkiem masy drona.
+Ruch drona w przestrzeni $\mathbb{R}^3$ analizuje się z wykorzystaniem dwóch nierozerwalnie połączonych, ortogonalnych układów odniesienia:
+\begin{enumerate}
+    \item \textbf{Układu inercjalnego $\mathcal{I}$} (związanego z Ziemią, np. układ NED). Jest to układ nieruchomy, w którym obowiązują zasady dynamiki Newtona.
+    \item \textbf{Układu związanego z ciałem $\mathcal{B}$} (ang. \textit{Body Frame}), którego początek $O_B$ pokrywa się ze środkiem masy drona (Center of Gravity -- CoG). Układ ten obraca się i porusza razem ze statkiem, co sprawia, że jest to układ \textit{nieinercjalny}.
+\end{enumerate}
 
-Równania dynamiki bryły sztywnej rozdzielają ruch na translację środka masy oraz rotację wokół niego. W układzie związanym z ciałem ($\mathcal{B}$) przyjmują one postać wektorową:
+Aby zapisać równania dynamiki w układzie obracającym się $\mathcal{B}$, musimy skorzystać z fundamentalnego twierdzenia kinematyki (twierdzenia o transporcie). Mówi ono, że pochodna w czasie dowolnego wektora $\mathbf{u}$ obserwowana w układzie inercjalnym $\mathcal{I}$ wyraża się poprzez jego pochodną lokalną w układzie $\mathcal{B}$ oraz człon rotacyjny:
+\begin{equation}
+    \left( \frac{d\mathbf{u}}{dt} \right)_{\mathcal{I}} = \left( \frac{d\mathbf{u}}{dt} \right)_{\mathcal{B}} + \boldsymbol{\omega} \times \mathbf{u}
+    \label{eq:transport_theorem}
+\end{equation}
+gdzie $\boldsymbol{\omega} = [p, q, r]^T$ jest wektorem prędkości kątowej układu $\mathcal{B}$ względem $\mathcal{I}$, wyrażonym w osiach układu $\mathcal{B}$.
+
+\subsubsection{Dynamika translacyjna i rotacyjna}
+
+Zastosowanie twierdzenia \eqref{eq:transport_theorem} do drugiej zasady dynamiki Newtona pozwala wyprowadzić rygorystyczny układ równań zwany \textbf{równaniami Newtona-Eulera}. Rozdzielają one ruch na translację środka masy oraz rotację wokół niego. Wprowadzając wektor prędkości liniowej $\mathbf{v} = [u, v, w]^T$ (wyrażony w układzie $\mathcal{B}$), otrzymujemy układ:
+
 \begin{align}
     m (\mathbf{\dot{v}} + \boldsymbol{\omega} \times \mathbf{v}) &= \mathbf{F} \label{eq:newton_trans} \\
     \mathbf{J} \mathbf{\dot{\boldsymbol{\omega}}} + \boldsymbol{\omega} \times (\mathbf{J} \boldsymbol{\omega}) &= \boldsymbol{\tau} \label{eq:euler_rot}
 \end{align}
-gdzie:
+
+Gdzie:
 \begin{itemize}
-    \item $m$ to całkowita masa statku, odpowiedzialna za bezwładność w ruchu translacyjnym.
-    \item $\mathbf{v} = [u, v, w]^T$ to wektor prędkości liniowej, a $\boldsymbol{\omega} = [p, q, r]^T$ to wektor prędkości kątowej.
-    \item $\mathbf{F}$ to wektor sił zewnętrznych (grawitacja, ciąg silników, opór aerodynamiczny).
-    \item $\boldsymbol{\tau}$ to wektor momentów sił (ang. \textit{torque}) próbujących obrócić statek wokół osi $X_B, Y_B, Z_B$.
-    \item $\mathbf{J}$ to \textbf{tensor momentu bezwładności}.
+    \item $m$ to całkowita masa statku.
+    \item $\mathbf{F}$ to wektor sił zewnętrznych (grawitacja, ciąg silników, opór aerodynamiczny) przetransformowany do układu $\mathcal{B}$. Zauważmy, że człon $m(\boldsymbol{\omega} \times \mathbf{v})$ reprezentuje pozorne siły bezwładności (Coriolisa i odśrodkową) wynikające z opisu ruchu w obracającym się układzie.
+    \item $\boldsymbol{\tau}$ to wektor zewnętrznych momentów sił (ang. \textit{torque}) generowanych głównie przez śmigła drona.
+    \item $\mathbf{J}$ to \textbf{tensor momentu bezwładności} statku względem jego środka masy.
 \end{itemize}
 
-\textbf{Fizyczna interpretacja Tensora Bezwładności ($\mathbf{J}$):} O ile masa stawia opór przy próbie przesunięcia obiektu, o tyle tensor bezwładności stawia opór przy próbie jego obrócenia. Zapisujemy go jako macierz:
+\subsubsection{Rygorystyczna definicja Tensora Bezwładności}
+
+Fizyczna masa $m$ stawia opór przy próbie przesunięcia obiektu (zmiany wektora $\mathbf{v}$). Analogicznie, tensor bezwładności $\mathbf{J}$ stawia opór przy próbie obrócenia obiektu (zmiany wektora $\boldsymbol{\omega}$). W ogólnym przypadku, dla bryły o ciągłym rozkładzie gęstości $\rho(\mathbf{r})$ w objętości $V$, tensor ten jest macierzą symetryczną definiowaną całkowicie jako:
+
 \begin{equation}
-    \mathbf{J} = \begin{bmatrix} 
+    \mathbf{J} = \int_V \rho(\mathbf{r}) \left( \|\mathbf{r}\|^2 \mathbf{I}_{3\times3} - \mathbf{r}\mathbf{r}^T \right) dV 
+    = \begin{bmatrix} 
     I_{xx} & -I_{xy} & -I_{xz} \\ 
     -I_{yx} & I_{yy} & -I_{yz} \\ 
     -I_{zx} & -I_{zy} & I_{zz} 
     \end{bmatrix}
 \end{equation}
-Dla klasycznego drona (Rys. \ref{fig:rigid_body}) masa jest rozłożona symetrycznie wzdłuż ramion. Oznacza to, że środek masy pokrywa się z początkiem układu, a momenty dewiacyjne (np. $I_{xy}$) znikają. Tensor staje się macierzą diagonalną z wartościami $I_{xx}$ (bezwładność przechyłu), $I_{yy}$ (bezwładność pochylenia) i $I_{zz}$ (bezwładność odchylenia na boki).
+Elementy na przekątnej to główne momenty bezwładności (np. $I_{xx} = \int_V (y^2 + z^2)\rho \, dV$), a elementy poza przekątną to tzw. momenty dewiacyjne (np. $I_{xy} = \int_V (x y)\rho \, dV$).
 
-Zauważmy na równaniu \eqref{eq:euler_rot} składnik nieliniowy $\boldsymbol{\omega} \times (\mathbf{J} \boldsymbol{\omega})$. Dowodzi on ważnego faktu inżynierskiego: obrót wokół jednej osi w przestrzeni automatycznie indukuje momenty sił na pozostałych osiach (tzw. zjawisko precesji żyroskopowej). Zmusza to kontrolery lotu drona do nieustannej, jednoczesnej kompensacji wszystkich osi na raz.
+Z algebry liniowej wiemy, że macierz $\mathbf{J}$ jest rzeczywista i symetryczna. Na mocy \textit{twierdzenia spektralnego}, macierz taka jest zawsze diagonalizowalna w bazie ortogonalnej. Oznacza to, że dla każdej bryły sztywnej istnieje taki układ osi (tzw. główne osie bezwładności), w którym momenty dewiacyjne znikają. 
 
+Dla klasycznego wielowirnikowca (patrz Rysunek \ref{fig:rigid_body}), masa rozłożona jest w dużej mierze symetrycznie względem płaszczyzn $XZ$ i $YZ$. Z powodu tej symetrii geometrycznej, osie układu $\mathcal{B}$ naturalnie pokrywają się z głównymi osiami bezwładności, co silnie upraszcza tensor do postaci diagonalnej:
+\begin{equation}
+    \mathbf{J} = \begin{bmatrix} 
+    I_{xx} & 0 & 0 \\ 
+    0 & I_{yy} & 0 \\ 
+    0 & 0 & I_{zz} 
+    \end{bmatrix}
+\end{equation}
+
+\subsubsection{Nieliniowe sprzężenia żyroskopowe}
+
+Zakładając diagonalność macierzy $\mathbf{J}$, możemy jawnie rozpisać wektorowe równanie rotacyjne \eqref{eq:euler_rot}. Rozwijając iloczyn wektorowy $\boldsymbol{\omega} \times (\mathbf{J} \boldsymbol{\omega})$, otrzymujemy układ klasycznych równań Eulera:
+\begin{align}
+    I_{xx} \dot{p} + (I_{zz} - I_{yy}) qr &= \tau_x \label{eq:euler_x} \\
+    I_{yy} \dot{q} + (I_{xx} - I_{zz}) pr &= \tau_y \label{eq:euler_y} \\
+    I_{zz} \dot{r} + (I_{yy} - I_{xx}) pq &= \tau_z \label{eq:euler_z}
+\end{align}
+
+Powyższy układ matematyczny rzuca światło na główny problem sterowania statkami powietrznymi. Pojawiające się w nim iloczyny prędkości kątowych ($qr, pr, pq$) stanowią \textbf{nieliniowe sprzężenia żyroskopowe}. 
+Oznacza to, że jeśli dron obraca się jednocześnie wokół dwóch osi (np. wykonuje manewr Pitch ($q \ne 0$) i Yaw ($r \ne 0$)), układ \textit{samoistnie} generuje wirtualny moment siły na trzeciej osi (w tym wypadku w osi Roll). 
+
+Dlatego właśnie w lotnictwie nie stosuje się prostych, niezależnych regulatorów dla każdej z osi z osobna. Zmusza to algorytmy kontrolera lotu do nieustannej, sprzężonej kompensacji całej macierzy stanu. W klasycznym, stabilnym zawisie (gdzie $p, q, r \approx 0$) człony nieliniowe znikają, a układ \eqref{eq:euler_x}-\eqref{eq:euler_z} sprowadza się do prostego modelu liniowego, na którym doskonale radzą sobie klasyczne regulatory PID. Wymuszenie jednak gwałtownych, agresywnych manewrów obnaża nieliniowość dynamiki bryły sztywnej.
 
 \subsection{Kąty Eulera: Orientacja w przestrzeni}
 
