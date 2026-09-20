@@ -1,20 +1,136 @@
+% =======================================================
 \chapter{Programistyczne podstawy}
 % =======================================================
+
+Kiedy aparat matematyczny określi pożądaną trajektorię lotu, a modele fizyczne zweryfikują jej wykonalność, niezbędne jest przeniesienie tego abstrakcyjnego opisu na fizyczną maszynę. W tym rozdziale omówiona zostanie architektura nowoczesnych systemów bezzałogowych, protokoły komunikacyjne oraz paradygmaty programistyczne pozwalające na tworzenie wysoce niezawodnego oprogramowania kontrolującego BSP w czasie rzeczywistym.
+
 \section{Architektura systemów bezzałogowych (Hardware i Software)}
-% Teoria: Rola Autopilota (Flight Controller) vs Komputer Pokładowy (Companion Computer).
+
+Aby bezpiecznie realizować misje autonomiczne, współczesne drony wykorzystują architekturę podzieloną na dwie niezależne warstwy obliczeniowe, co gwarantuje separację krytycznych systemów bezpieczeństwa (ang. \textit{Fault Tolerance}) od systemów decyzyjnych.
+
+\begin{enumerate}
+    \item \textbf{Autopilot (Kontroler Lotu -- Flight Controller):}
+    Jest to niskopoziomowy układ scalony (mikrokontroler, np. STM32), na którym działa System Czasu Rzeczywistego (RTOS). Jego jedynym zadaniem jest czytanie sensorów z częstotliwością np. 400\,Hz, uruchamianie filtrów EKF i wyliczanie sygnałów PWM dla silników. Oprogramowanie to (np. ArduPilot) jest krytyczne dla życia statku. Autopilot nie „myśli” o skomplikowanych algorytmach optymalizacyjnych czy przetwarzaniu obrazu – po prostu zapewnia, by maszyna utrzymała się w powietrzu.
+
+    \item \textbf{Komputer Pokładowy (Companion Computer):}
+    Jest to wysokopoziomowy mikrokomputer (np. Raspberry Pi, Nvidia Jetson) działający na systemie operacyjnym klasy Linux. Uruchamiany jest na nim kod w języku Python lub C++ (np. nasze skrypty z kursu). Komputer pokładowy przetwarza trudne matematycznie algorytmy (TSP, nawigacja predykcyjna) i za pomocą kabla szeregowego podaje Autopilotowi proste komendy, np. \textit{„leć prosto z prędkością 5 m/s”}. W razie awarii (zawieszenia się) Komputera Pokładowego, Autopilot nadal działa i może bezpiecznie wylądować statkiem.
+\end{enumerate}
 
 \section{Symulator SITL i protokół MAVLink}
-% Teoria: Software-In-The-Loop. Architektura klient-serwer. UDP i TCP w komunikacji MAVLink.
-\subsection{Przykład praktyczny: Inicjalizacja środowiska i pierwszy rozruch}
-% Bash/Kod: Skrypt startowy w bashu z komendami uruchamiającymi drona oraz wirtualne środowisko (venv).
+
+Nauka i testowanie algorytmów nawigacyjnych na fizycznych dronach jest niepraktyczna, ryzykowna i niezwykle kosztowna. Z tego powodu inżynieria lotnicza stosuje podejście \textbf{Software-In-The-Loop (SITL)}.
+
+W symulacji SITL ten sam skompilowany kod (w C++), który trafiłby na fizyczny procesor Autopilota, uruchamiany jest jako izolowany proces w systemie Linux. Silnik fizyczny w tle oszukuje to oprogramowanie, wysyłając do niego sztuczne pomiary z wirtualnego GPS-u, wiatromierza i barometru. Dzięki temu testowany skrypt Pythona "nie wie", że rozmawia z programem na komputerze – jest to środowisko o niemal 100\% wierności w stosunku do lotu w świecie rzeczywistym.
+
+\subsection{Protokół komunikacyjny MAVLink}
+
+Wymiana informacji między Komputerem Pokładowym (Python) a Autopilotem (SITL) odbywa się w warstwie sieciowej (zwykle po portach UDP/TCP) przy użyciu \textbf{Protokołu MAVLink} (\textit{Micro Air Vehicle Link}). 
+MAVLink to wysoce odchudzony, binarny protokół komunikacyjny. Każda wiadomość (np. odczyt wysokości lub komenda ruchu) pakowana jest w kilkunastobajtową ramkę danych, co zapewnia szybkość transmisji i odporność na utratę pakietów w sieciach bezprzewodowych.
+
+W naszej architekturze rolę centralnego routera odgrywa program \textbf{MAVProxy}. Łączy się on z symulatorem (Dronem) i dystrybuuje pakiety MAVLink na lokalne porty UDP (np. \texttt{127.0.0.1:14550}), do których następnie "podpinają się" nasze skrypty Pythona.
+
+\subsection{Przykład praktyczny: Inicjalizacja środowiska}
+
+W kursie wykorzystujemy skrypty w powłoce \texttt{Bash}, które automatyzują proces uruchamiania infrastruktury sieciowej dla SITL.
+\begin{lstlisting}[language=bash, caption=Skrypt startowy powołujący wirtualnego drona do życia]
+#!/bin/bash
+# Zmienne srodowiskowe wczytywane z .profile zapewniaja dostep do narzedzi ArduPilota
+source ~/.profile
+
+# Uruchomienie fizyki i routera w tle
+# Flaga --map otwiera interfejs graficzny GCS, 
+# a --out=127.0.0.1:14550 wyprowadza sygnal MAVLink dla naszego Pythona.
+cd ~/ardupilot/ArduCopter
+sim_vehicle.py -v ArduCopter -f + --map --out=127.0.0.1:14550
+\end{lstlisting}
+
 
 \section{Paradygmat asynchroniczny i tryby lotu}
-% Teoria: Rola pre-arm checks. Opóźnienia systemowe. Różnice między trybami GUIDED (sterowanie zewnętrzne), AUTO (wykonanie misji z EEPROM) i RTL.
+
+Pisanie programów sterujących dla dronów różni się fundamentalnie od pisania klasycznych aplikacji sekwencyjnych. Prawa fizyki nakazują programiście dostosowanie się do \textbf{paradygmatu asynchronicznego} -- komenda wysłana z Pythona (np. \textit{„wystartuj na 10 metrów”}) wykonuje się w mikrosekundę w CPU, ale jej fizyczna realizacja przez maszyny elektryczne i śmigła trwa kilkanaście sekund.
+
+Dlatego kod drona obfituje w \textbf{Maszyny Stanów (State Machines)} oraz niekończące się pętle (pętle nadążne), które upewniają się, że uwarunkowania fizyczne zostały spełnione przed przejściem do kolejnej instrukcji.
+
+\subsection{Tryby lotu (Flight Modes)}
+Stan i stopień autonomii decyzyjnej drona zależy od wymuszonego w MAVLinku trybu:
+\begin{itemize}
+    \item \textbf{STABILIZE:} Dron ignoruje wektory z komputera pokładowego, odpowiada jedynie na manualne wychylenia drążków z aparatury sterującej operatora.
+    \item \textbf{GUIDED:} Tryb autonomii zewnętrznej. Autopilot dba o stabilizację wiatrową, ale to zewnętrzny skrypt Pythona ma pełną kontrolę na bieżąco, wysyłając mu ciągle nowe współrzędne docelowe lub wektory prędkości.
+    \item \textbf{AUTO:} Tryb autonomii wewnętrznej. Dron całkowicie odcina się od zewnętrznych systemów sterowania na żywo i samodzielnie, punkt po punkcie, realizuje misję wyciągniętą ze swojej pamięci nieulotnej (EEPROM). Skrypt Pythona pełni tu jedynie funkcję obserwatora/nadzorcy.
+    \item \textbf{RTL (Return To Launch):} Tryb awaryjny (z ang. powrót do startu). Wyzwolony z komputera lub automatycznie (tzw. Failsafe z powodu braku baterii), ignoruje wszelkie komendy, wznosi się na pułap bezpieczny i ląduje w bazie.
+\end{itemize}
+
 \subsection{Przykład praktyczny: Bezpieczna maszyna stanów}
-% Kod Python: Skrypt 01_start.py. Blokująca pętla oczekująca na wysokość przelotową.
+
+Biblioteka \texttt{dronekit} dla języka Python stanowi wysokopoziomową otoczkę (ang. \textit{wrapper}) nad surowym protokołem MAVLink. Umożliwia ona manipulowanie stanem drona poprzez obiekty klas i ich atrybuty. Poniższy kod (fragment skryptu \texttt{01\_start.py}) demonstruje prawidłową obsługę asynchronicznych opóźnień:
+
+\begin{lstlisting}[language=Python, caption=Procedura nawiązywania połączenia i bezpiecznego uzbrajania maszyny]
+from dronekit import connect, VehicleMode
+import time
+
+def arm_and_takeoff(vehicle, target_altitude: float) -> None:
+    # 1. Zabezpieczenie przed brakiem gotowosci (Pre-arm Checks).
+    # vehicle.is_armable to dynamiczny atrybut, ktory zwraca True dopiero w momencie,
+    # gdy wewnetrzne systemy EKF i GPS zglosza fizyczna gotowosc do lotu.
+    print("Waiting for vehicle initialization...")
+    while not vehicle.is_armable:
+        time.sleep(1)
+        
+    # 2. Bezpieczna zmiana Trybu Lotu na GUIDED
+    print("Setting mode to GUIDED and Arming motors...")
+    vehicle.mode = VehicleMode("GUIDED")
+    vehicle.armed = True # Wysłanie fizycznego odbezpieczenia śmigieł
+    
+    # 3. Asynchroniczne sprawdzenie (Silniki potrzebują ułamka sekundy na rozruch)
+    while not vehicle.armed:
+        time.sleep(1)
+        
+    print(f"Taking off to {target_altitude} meters...")
+    vehicle.simple_takeoff(target_altitude)
+    
+    # 4. Pętla nadążna (Wznoszenie drona z uzyciem barometru/GPS)
+    while True:
+        # vehicle.location.global_relative_frame to zagnieżdżony obiekt (klasa LocationGlobalRelative),
+        # którego atrybut '.alt' zwraca wysokość (w metrach) względem miejsca startu.
+        current_altitude = vehicle.location.global_relative_frame.alt
+        if current_altitude >= target_altitude * 0.95:
+            # 95% tolerancji wynika z zasady nieoznaczoności w fizyce (błąd szumu czujników). 
+            # Dron idealnie w cel nigdy nie trafi.
+            print("Cruising altitude reached.")
+            break
+        time.sleep(1)
+\end{lstlisting}
+
 
 \section{Nawigacja punktowa a kontrola wektorowa}
-% Teoria: simple_goto() (wysłanie do punktu) kontra send_ned_velocity() (bezpośrednia ingerencja w wektor prędkości).
-\subsection{Przykład praktyczny: Pętla nadążna z tolerancją zbieżności}
-% Kod Python: Skrypt 02_trajectory.py z implementacją sprawdzania promienia akceptacji celu.
 
+W ramach biblioteki DroneKit oraz MAVLink istnieją dwa rozłączne paradygmaty przemieszczania drona w przestrzeni kosztem zużycia energii elektrycznej.
+
+\subsection{Nawigacja punktowa (Position Control)}
+Realizowana poprzez metody takie jak \texttt{vehicle.simple\_goto(target\_location)}. Jako wejście otrzymuje ściśle zdefiniowany punkt GPS. 
+Paradygmat ten polega na przerzuceniu całej matematyki optymalizacyjnej na kontroler \textit{Autopilota}. To niskopoziomowe PID-y na płytce wyliczają, z jaką prędkością dron ma ruszyć i kiedy ma zacząć hamować. Podejście to jest niezawodne i szeroko opisane na przykładzie wyznaczania parametrycznych trajektorii w module matematycznym (np. kwadrat ze skryptu \texttt{02\_trajectory.py}).
+
+\subsection{Kontrola wektorowa (Velocity Control)}
+W przypadku zaawansowanych zagadnień takich jak unikanie kolizji (Repulsja), pościg w 3D czy algorytmy zachowań stadnych (Cucker-Smale), określenie docelowej współrzędnej nie jest fizycznie wykonalne – dążymy bowiem do zmiany \textbf{kierunku oraz prędkości} w danym, krótkim interwale $\Delta t$.
+
+Realizuje to bezpośrednia ingerencja w wektor prędkości przy użyciu \textbf{surowych pakietów MAVLink}.
+Wysłanie wiadomości o identyfikatorze \texttt{SET\_POSITION\_TARGET\_LOCAL\_NED} pozwala ominąć nawigatora Autopilota i wysłać żądane przyspieszenia bezpośrednio na układ aerodynamiczny.
+
+\begin{lstlisting}[language=Python, caption=Wysyłanie bezpośredniego wektora prędkości do silników drona]
+from pymavlink import mavutil
+
+def send_ned_velocity(vehicle, velocity_x: float, velocity_y: float, velocity_z: float) -> None:
+    """Wysyła wektor prędkości (m/s) w układzie NED."""
+    # message_factory tworzy i pakuje strumień bitów zgodnie ze standardem MAVLink.
+    msg = vehicle.message_factory.set_position_target_local_ned_encode(
+        0, 0, 0, 
+        mavutil.mavlink.MAV_FRAME_LOCAL_NED, # Definicja ukladu odniesienia (North, East, Down)
+        0b0000111111000111, # Maska bitowa: nakazuje zignorowac pozycję, a wykonac TYLKO predkosc.
+        0, 0, 0, # Parametry pozycji (ignorowane dzięki masce)
+        velocity_x, velocity_y, velocity_z, # Zadane przez nas predkosci na 3 osiach w metrach/sekunde
+        0, 0, 0, 0, 0 # Parametry przyspieszenia i yaw (ignorowane)
+    )
+    vehicle.send_mavlink(msg)
+\end{lstlisting}
+
+Podstawową cechą (i zagrożeniem) stosowania kontroli wektorowej jest fakt, że wektory wysyłane w ten sposób są natychmiastowe. Jeśli program w Pythonie przestanie z jakiegokolwiek powodu wysyłać w pętli nowe wektory, dron może kontynuować lot w zadanym wcześniej kierunku w nieskończoność. Dlatego algorytmy te wymagają najwyższej jakości kodu oraz ścisłego panowania nad synchronizacją czasu (`dt`).

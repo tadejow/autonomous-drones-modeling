@@ -1,13 +1,80 @@
+% =======================================================
 \chapter{Algorytmy ruchu kolektywnego w 3D}
 % =======================================================
+
+Klasyczna automatyka lotnicza traktuje drona jako pojedynczy, niezależny układ poddawany bezpośrednim komendom z komputera pokładowego lub stacji bazowej. Wzrastające zapotrzebowanie na skomplikowane operacje przestrzenne (np. rolnictwo obszarowe, synchroniczne pokazy świetlne, systemy militarne) ujawniło słabość tego scentralizowanego podejścia. W tym rozdziale wprowadzimy paradygmat robotyki roju, w którym tysiące maszyn potrafią samoczynnie formować trójwymiarowe szyki w oparciu o czystą dynamikę nieliniowych układów równań różniczkowych.
+
 \section{Wprowadzenie do robotyki roju (Swarm Robotics)}
-% Teoria: Brak centralnego sterowania. Decyzje lokalne prowadzące do emergentnych zachowań globalnych (Flocking).
+
+Robotyka roju opiera się na inspiracji biologicznej zjawiskami zbiorowymi (gromadnymi), takimi jak stada ptaków (ang. \textit{flocking}), ławice ryb czy kolonie owadów. Posiada ona kilka fundamentalnych cech matematyczno-inżynieryjnych:
+\begin{itemize}
+    \item \textbf{Decentralizacja:} Rój nie posiada absolutnego "mózgu" (jednego komputera obliczającego pozycje dla wszystkich dronów). Każdy dron wykonuje skrypt niezależnie.
+    \item \textbf{Lokalne zasady (Local Interactions):} Dron reaguje wyłącznie na to, co dzieje się w jego bezpośrednim otoczeniu. Nie musi wiedzieć o wszystkich maszynach w roju, obchodzą go jedynie jego najbliżsi sąsiedzi z grafu topologicznego.
+    \item \textbf{Emergencja zachowań:} Bardzo proste reguły matematyczne (np. „leć z tą samą prędkością co sąsiad” i „nie zderz się z sąsiadem”) na poziomie indywidualnego agenta skutkują powstaniem wysoce zorganizowanej i skomplikowanej struktury globalnej na poziomie całego roju.
+\end{itemize}
+Dzięki tym cechom rój jest niesamowicie odporny (ang. \textit{robust}). Gdy z awarii ulegnie stacja bazowa lub wybrane drony wyłączą się w locie, pozostałe maszyny po prostu zamkną szyk bez zatrzymywania misji.
 
 \section{Model Cuckera-Smale'a}
-% Teoria: Dynamiczna synchronizacja wektorów prędkości w grafach zależących od odległości. Funkcja wpływu z parametrem Beta.
+
+Większość analitycznych badań nad stadami ptaków bazuje na kultowym w świecie matematyki \textbf{modelu Cuckera-Smale'a (C-S)}\footnote{Cucker, F., Smale, S., \textit{Emergent Behavior in Flocks}, IEEE Transactions on Automatic Control, 2007.}. Jest to symetryczny model ciągły, w którym interakcja (siła "wyrównywania" prędkości) pomiędzy dwoma dronami zależy odwrotnie proporcjonalnie od ich fizycznego dystansu.
+
+Dla $N$ agentów w trójwymiarowej przestrzeni $\mathbb{R}^3$, gdzie $\mathbf{x}_i \in \mathbb{R}^3$ to pozycja, a $\mathbf{v}_i \in \mathbb{R}^3$ to prędkość drona $i$, czysty model C-S dany jest układem równań różniczkowych (dla $i = 1, \dots, N$):
+\begin{equation}
+    \mathbf{\dot{v}}_i = \frac{K_{\text{cs}}}{N} \sum_{j=1}^{N} \psi(\|\mathbf{x}_j - \mathbf{x}_i\|) \cdot (\mathbf{v}_j - \mathbf{v}_i)
+    \label{eq:pure_cs}
+\end{equation}
+W tym modelu $K_{\text{cs}}$ jest tzw. siłą sprzężenia (ang. \textit{coupling strength}), oznaczającą szybkość dopasowywania się dronów do siebie. Funkcja $\psi(r)$ to waga wpływu zależna od odległości $r = \|\mathbf{x}_j - \mathbf{x}_i\|$, zazwyczaj modelowana potęgowo:
+\begin{equation}
+    \psi(r) = \frac{1}{(1 + r^2)^\beta}
+\end{equation}
+Współczynnik zaniku $\beta \ge 0$ kontroluje to, jak bardzo dron "ignoruje" maszyny znajdujące się daleko od niego. Dla małych $\beta$ drony w całym roju widzą się nawzajem. Jeśli $\beta > \frac{1}{2}$, drony mogą rozdzielić się na niezależne stada.
+
 \subsection{Sztuczne pola potencjałowe: Kohezja i Repulsja}
-% Teoria: Sprężystość przyciągająca do stada i odwrotnie proporcjonalna siła Coulombowska zapobiegająca kolizjom.
+
+Czysty układ (\ref{eq:pure_cs}) odpowiada za synchronizację pędów (wyrównanie prędkości do wspólnego wektora), ale \textbf{nie zapobiega zderzeniom}. Aby uniknąć fizycznych kolizji dronów w powietrzu, w inżynierii model C-S rozbudowuje się o tak zwane \textbf{sztuczne pola potencjałowe} (ang. \textit{Artificial Potential Fields}). Do układu dodaje się dwa nieliniowe wektory zależące tylko od położenia przestrzennego.
+
+\paragraph{1. Siła Repulsji (Odpychanie antykolizyjne)}
+Siła ta wymusza na maszynach ucieczkę od siebie, aby zachować dystans bezpieczny $D_{\text{safe}}$ (zazwyczaj jest to $3-4$ krotność szerokości ramy wielowirnikowca z włączonymi śmigłami). Aby siła repulsji nie rozrzuciła roju podczas normalnego lotu, modelujemy ją tak, by aktywowała się \textbf{tylko i wyłącznie} w momencie naruszenia strefy bezpiecznej. Wykorzystujemy prawo odwrotnych sześcianów (analogiczne do silnych odpychających pól elektrostatycznych na bardzo krótkich dystansach):
+\begin{equation}
+    \mathbf{v}_{\text{rep}, i} = R_{\text{rep}} \sum_{\substack{j \ne i \\ \|\mathbf{x}_{ij}\| < D_{\text{safe}}}} \frac{\mathbf{x}_i - \mathbf{x}_j}{\|\mathbf{x}_i - \mathbf{x}_j\|^3}
+\end{equation}
+gdzie $R_{\text{rep}}$ to krytyczna stała siły odpychającej, a $\mathbf{x}_{ij} = \mathbf{x}_i - \mathbf{x}_j$.
+
+\paragraph{2. Siła Kohezji (Przyciąganie stada)}
+W systemach \textit{Leader-Follower}, jeden z dronów ($i=0$) wyznaczany jest jako Przewodnik. Posiada on sztywno zadaną misję (np. wykonuje przelot komiwojażera TSP). Reszta stada ($i > 0$) jest pociągana w jego kierunku siłą sprężystą (proporcjonalną do odległości), co zapobiega gubieniu się dronów we mgle i rozrywaniu roju:
+\begin{equation}
+    \mathbf{v}_{\text{coh}, i} = K_{\text{coh}} (\mathbf{x}_0 - \mathbf{x}_i)
+\end{equation}
 
 \section{Implementacja hybrydowa wieloagentowa}
+
+Łącząc powyższe zjawiska, otrzymujemy ostateczne równanie sterujące skrzydłowymi drona (implementacja w skryptach z rodziny \texttt{05\_}). Wyliczane asynchronicznie przez komputer przyspieszenie dośrodkowe przyjmuje postać uogólnionej sumy wektorowej:
+\begin{equation}
+    \mathbf{v}_{\text{target}, i} = \mathbf{v}_i + \Big( \mathbf{v}_{\text{cucker}} + \mathbf{v}_{\text{repulsja}} + \mathbf{v}_{\text{kohezja}} \Big) \cdot \Delta t
+\end{equation}
+Ten paradygmat gwarantuje, że przy dużej odległości dominować będzie przyciąganie, przy bliskim spotkaniu gwałtownie zadziała funkcja antykolizyjna, a w stanie ustalonej formacji zjawisko to zostanie zniwelowane przez stabilizację Cuckera-Smale'a, tworząc płynnie lecący klucz maszyn.
+
 \subsection{Przykład praktyczny: Dynamiczne rozdzielenie formacji (Bifurkacja roju)}
-% Kod Python: Skrypt 05_b_flock_split.py. Logika wyboru atraktora (lidera), monitorowanie strefy bezpiecznej (D_SAFE) i lądowanie podgrup w 3D.
+
+Fascynującym matematycznie efektem wykorzystywania zanikającej z odległością wagi $\psi(r)$ jest możliwość wywołania naturalnej bifurkacji (podziału) zachowania w dużych grupach maszyn. Zjawisko to zademonstrowano w ramach zaawansowanego eksperymentu w skrypcie \texttt{05\_b\_flock\_split.py}.
+
+Flota powołanych w symulatorze SITL ośmiu dronów startuje w jednej gęstej chmurze. Zostają w niej ustanowieni Lider 1 i Lider 2. Skrypt nie narzuca skrzydłowym (dronom od 3 do 8) konkretnego przypisania (nie stosuje instrukcji programistycznych typu \texttt{if my\_id < 5: follow(Leader\_1)}). Agentów wiąże jedynie bezduszna formuła matematyczna: \textit{"Dąż do nabliższego Lidera"}:
+\begin{lstlisting}[language=Python, caption=Wybór atraktora w układzie z dwoma Liderami]
+# Logika kazdego Skrzydlowego zalezna jest tylko od matematycznej odleglosci
+d_to_l1 = np.linalg.norm(X[0] - X[i]) # Odleglosc wektorowa do Lidera 1
+d_to_l2 = np.linalg.norm(X[1] - X[i]) # Odleglosc wektorowa do Lidera 2
+
+# Wybierz Lidera, ktorego wplyw bedzie silniejszy (bo jest blizej)
+closest_leader = X[0] if d_to_l1 < d_to_l2 else X[1]
+v_cohesion = K_COHESION * (closest_leader - X[i])
+\end{lstlisting}
+
+Podczas Faz 1 i 2 symulacji Liderzy poruszają się wspólnie równoległym torem, a cały rój stanowi silnie połączoną, 8-elementową formację 3D. Jednak po ok. 50 sekundzie (Faza 2) Lider 1 i Lider 2 wykonują gwałtowny zwrot pod kątem prostym, oddalając się od siebie. Pociąga to za sobą spektakularny ciąg wydarzeń matematycznych:
+\begin{enumerate}
+    \item Odległość $r$ między podgrupami rośnie z kwadratem czasu.
+    \item Dla drona znajdującego się na lewym skrzydle siła przyciągająca Lidera 2 staje się drastycznie mniejsza niż siła przyciągająca Lidera 1. 
+    \item Mianownik w równaniu Cuckera-Smale'a $(1+r^2)^\beta$ dla dronów z przeciwnych klastrów „eksploduje” i funkcja wpływu synchronizacji między nimi spada do zera.
+    \item Rój dzieli się na dwa absolutnie niezależne klucze po 4 maszyny. Klucze te ignorują się nawzajem, powoli lądując na dwóch oddalonych o kilkadziesiąt metrów lądowiskach.
+\end{enumerate}
+
+Obserwacja procesu bifurkacji jest wspierana przez zaimplementowany panel \texttt{matplotlib}. W prawym subplocie graficznym znajduje się \textit{Monitor Zbliżeniowy}, na żywo rejestrujący historię najkrótszych euklidesowych odległości między dronami. Połączenia bezpieczne wygaszane są na szaro, by nie zaciemniać obrazu. W momencie, gdy drony testują i naruszają granicę odpychania ($D_{\text{safe}}$) podczas ciasnych manewrów formowania podgrup, krzywa odległości podświetla się na żywo w kolorze Lidera powiązanego ze zdarzeniem, dowodząc, że model repulsyjny zatrzymał drony idealnie nad wirtualną granicą fizycznego zderzenia.
