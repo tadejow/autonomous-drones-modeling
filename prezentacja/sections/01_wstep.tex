@@ -72,31 +72,32 @@
     
     \vspace{0.4cm}
     \begin{center}
-    \begin{tikzpicture}[scale=0.9, transform shape,
-        box/.style={draw, rounded corners, fill=blue!10, text width=3cm, align=center, minimum height=1.2cm},
+    \begin{tikzpicture}[scale=0.8, transform shape,
+        box/.style={draw, rounded corners, fill=blue!10, text width=2.8cm, align=center, minimum height=1.2cm},
         arrow/.style={->, thick, >=stealth}]
         
         % Komponenty
         \node[box, fill=green!20] (gcs) at (0, 0) {\textbf{Stacja Bazowa (GCS)} \\ \footnotesize QGroundControl \\ Mission Planner};
-        \node[box, fill=orange!20] (mavlink) at (5, 0) {\textbf{Protokół MAVLink} \\ \footnotesize Telemetria, Komendy};
-        \node[box, fill=gray!20] (drone) at (10, 0) {\textbf{Kontroler Lotu} \\ \footnotesize ArduPilot (SITL) \\ Pixhawk};
+        \node[box, fill=orange!20] (mavlink) at (5.5, 0) {\textbf{Protokół MAVLink} \\ \footnotesize Telemetria, Komendy};
+        \node[box, fill=gray!20] (drone) at (11, 0) {\textbf{Kontroler Lotu} \\ \footnotesize ArduPilot (SITL) \\ Pixhawk};
         
-        % Strzałki komunikacji
-        \draw[arrow, bend left=15] (gcs.east) to node[above, font=\footnotesize]{SET\_MODE (GUIDED)} (mavlink.west);
-        \draw[arrow, bend left=15] (mavlink.east) to node[above, font=\footnotesize]{ARM (Uzbrojenie)} (drone.west);
+        % Strzałki komunikacji (góra)
+        \draw[arrow, bend left=20] (gcs.north east) to node[above, font=\scriptsize, align=center]{SET\_MODE\\(GUIDED)} (mavlink.north west);
+        \draw[arrow, bend left=20] (mavlink.north east) to node[above, font=\scriptsize, align=center]{ARM\\(Uzbrojenie)} (drone.north west);
         
-        \draw[arrow, bend left=15] (drone.south west) to node[below, font=\footnotesize]{GPS, Attitude (Pitch/Roll)} (mavlink.south east);
-        \draw[arrow, bend left=15] (mavlink.south west) to node[below, font=\footnotesize]{HEARTBEAT (Status)} (gcs.south east);
+        % Strzałki komunikacji (dół)
+        \draw[arrow, bend left=20] (drone.south west) to node[below, font=\scriptsize, align=center]{GPS, Attitude\\(Pitch/Roll)} (mavlink.south east);
+        \draw[arrow, bend left=20] (mavlink.south west) to node[below, font=\scriptsize, align=center]{HEARTBEAT\\(Status)} (gcs.south east);
         
         % Proces Pre-Arm
-        \node[draw, dashed, fill=yellow!10, text width=4cm, align=left] at (10, -2.5) {
+        \node[draw, dashed, fill=yellow!10, text width=4cm, align=left] at (11, -3) {
             \textbf{Pre-Arm Checks:}\\
             1. GPS Lock (3D Fix)\\
             2. IMU Calibration\\
             3. Barometer OK\\
             4. Bateria > 20\%
         };
-        \draw[->, dashed, thick] (10, -1.2) -- (10, -0.6);
+        \draw[->, dashed, thick] (11, -1.8) -- (11, -0.8);
         
     \end{tikzpicture}
     \end{center}
