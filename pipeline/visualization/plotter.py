@@ -67,8 +67,8 @@ class DronePlotter:
         if attitude:
             pitch, roll, yaw = attitude
             import numpy as np
-            # Długość ramienia do wizualizacji przechyłu
-            arm_len = 2.0
+            # Długość ramienia do wizualizacji przechyłu (znacznie powiększona dla lepszego widoku bujania!)
+            arm_len = 5.0
             # Uproszczona rotacja
             tilt_x = dx + arm_len * np.sin(pitch)
             tilt_y = dy + arm_len * np.sin(roll)

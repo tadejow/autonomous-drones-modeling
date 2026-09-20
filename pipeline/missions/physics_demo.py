@@ -17,27 +17,21 @@ def run_physics_wind_demo(connection_string='udp:127.0.0.1:14550'):
     manager = VehicleManager(connection_string)
     vehicle = manager.get_vehicle()
 
-    # Odbieranie wektora wiatru
-    vehicle.wind_speed = 0.0
-    vehicle.wind_direction = 0.0
+    # Automatyczne ustawienie silnego wiatru przez parametry MAVLink!
+    print("Programowanie symulatora - ustawiam wiatr 15m/s z południa!")
+    vehicle.parameters['SIM_WIND_SPD'] = 15.0
+    vehicle.parameters['SIM_WIND_DIR'] = 180.0
 
-    @vehicle.on_message('WIND')
-    def wind_listener(self, name, message):
-        self.wind_speed = message.speed
-        self.wind_direction = message.direction
+    # Start na niższą wysokość, żeby było szybciej
+    manager.arm_and_takeoff(7.0)
 
-    manager.arm_and_takeoff(15.0)
-
-    print("\n[INFO] Wpisz w konsoli MAVProxy aby wywołać wiatr:")
-    print(" -> param set SIM_WIND_SPD 10")
-    
     # Inicjalizacja Plottera
     plotter = DronePlotter(title="Fizyka lotu - Walka z Wiatrem (Bujanie)", trail_length=300)
     # Odpowiednia perspektywa żeby widzieć bujanie poziome i pionowe
     plotter.set_view(elev=15, azim=45) 
     
-    print("\nNagrywanie telemetrii przez 30 sekund...")
-    for i in range(300): # 30 sekund w pętli co 0.1s
+    print("\nNagrywanie telemetrii...")
+    for i in range(150): # Szybszy eksperyment, mniej klatek
         loc = vehicle.location.local_frame
         if loc.north is not None:
             # Pozycja XYZ
@@ -52,10 +46,11 @@ def run_physics_wind_demo(connection_string='udp:127.0.0.1:14550'):
 
             # Możemy wydrukować co sekundę stan
             if i % 10 == 0:
-                print(f"[{i//10}/30s] Attitude: P={math.degrees(pitch):5.1f} R={math.degrees(roll):5.1f} Y={math.degrees(yaw):5.1f} | Wind: {vehicle.wind_speed:.1f}m/s")
+                print(f"Attitude: P={math.degrees(pitch):5.1f} R={math.degrees(roll):5.1f} Y={math.degrees(yaw):5.1f}")
                 
         time.sleep(0.1)
 
+    # Powrót
     manager.rtl_and_close()
     plotter.close()
 
