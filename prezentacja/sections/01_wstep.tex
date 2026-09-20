@@ -43,25 +43,28 @@
         \end{scope}
 
         % Osie Body Frame (Wydłużone)
-        \draw[->, >=stealth, line width=1.2pt, red] (O) -- (2.0,0,0) node[right, xshift=2mm, font=\footnotesize] {$X_B$ (Przód)};
-        \draw[->, >=stealth, line width=1.2pt, green!60!black] (O) -- (0,2.0,0) node[right, xshift=2mm, font=\footnotesize] {$Y_B$ (Prawa strona)};
-        \draw[->, >=stealth, line width=1.2pt, blue] (O) -- (0,0,-2.0) node[below, yshift=-2mm, font=\footnotesize] {$Z_B$ (Dół)};
+        \draw[->, >=stealth, line width=1.2pt, red] (O) -- (2.5,0,0) node[below left, font=\footnotesize] {$X_B$ (Przód)};
+        \draw[->, >=stealth, line width=1.2pt, green!60!black] (O) -- (0,2.5,0) node[above right, font=\footnotesize] {$Y_B$ (Prawa strona)};
+        \draw[->, >=stealth, line width=1.2pt, blue] (O) -- (0,0,-2.5) node[below, font=\footnotesize] {$Z_B$ (Dół)};
 
         % --- Kąty Eulera z użyciem płaszczyzn 3D ---
         
         % Roll (Obrót wokół osi X_B -> Leży w płaszczyźnie YZ)
-        \begin{scope}[canvas is yz plane at x=1.5]
-            \draw[->, >=stealth, red, thick] (0.4, 0) arc (0:270:0.4) node[midway, right, font=\footnotesize] {Przechylenie / Roll ($\phi$)};
+        \begin{scope}[canvas is yz plane at x=2.0]
+            \draw[->, >=stealth, red, thick] (0.6, 0) arc (0:270:0.6);
+            \node[red, font=\footnotesize, fill=white, inner sep=1pt] at (0.9, 1.2) {Przechylenie / Roll ($\phi$)};
         \end{scope}
 
         % Pitch (Obrót wokół osi Y_B -> Leży w płaszczyźnie XZ)
-        \begin{scope}[canvas is xz plane at y=1.5]
-            \draw[->, >=stealth, green!60!black, thick] (0.4, 0) arc (0:-270:0.4) node[midway, below, font=\footnotesize] {Pochylenie / Pitch ($\theta$)};
+        \begin{scope}[canvas is xz plane at y=2.0]
+            \draw[->, >=stealth, green!60!black, thick] (0.6, 0) arc (0:-270:0.6);
+            \node[green!60!black, font=\footnotesize, fill=white, inner sep=1pt] at (0.9, 1.2) {Pochylenie / Pitch ($\theta$)};
         \end{scope}
 
         % Yaw (Obrót wokół osi Z_B -> Leży w płaszczyźnie XY)
-        \begin{scope}[canvas is xy plane at z=-1.5]
-            \draw[->, >=stealth, blue, thick] (0.4, 0) arc (0:-270:0.4) node[midway, right, font=\footnotesize] {Odchylenie / Yaw ($\psi$)};
+        \begin{scope}[canvas is xy plane at z=-2.0]
+            \draw[->, >=stealth, blue, thick] (0.6, 0) arc (0:-270:0.6);
+            \node[blue, font=\footnotesize, fill=white, inner sep=1pt] at (1.0, -1.2) {Odchylenie / Yaw ($\psi$)};
         \end{scope}
 
     \end{tikzpicture}
