@@ -18,6 +18,10 @@ done
 
 mkdir -p nagrania
 
+echo "Czyszczenie środowiska (zamykanie starych okien)..."
+killall -9 sim_vehicle.py waf mavproxy.py xfce4-terminal python3 ffmpeg 2>/dev/null
+sleep 2
+
 # Pobranie faktycznej rozdzielczości Twojego pulpitu do nagrywania (np. 1920x1080)
 RESOLUTION=$(xdpyinfo | awk '/dimensions/{print $2}')
 echo "Wykryto rozdzielczość ekranu: $RESOLUTION"

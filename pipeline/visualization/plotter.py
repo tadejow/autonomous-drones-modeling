@@ -92,4 +92,4 @@ class DronePlotter:
 
     def close(self):
         self.plt.ioff()
-        self.plt.show()
+        self.plt.close('all')
