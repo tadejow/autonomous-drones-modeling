@@ -12,16 +12,32 @@
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Rój w akcji}
-    Rozwiązywanie równań różniczkowych przez każdy z dronów w czasie rzeczywistym pozwala im zachowywać się jak ławica ryb.
+\begin{frame}{Rój w środowisku ArduPilot}
+    Samo oprogramowanie nie wie początkowo, że ma do czynienia z wieloma maszynami. Zestawiamy architekturę opartą o rozproszoną komunikację między systemami.
+    
+    \vspace{0.3cm}
+    Drony wymieniają się swoim wektorem położenia i prędkości.
     
     \vspace{0.5cm}
-    \textbf{Demonstracja wideo:} Rój dronów - model Cuckera-Smale'a i podział grupy w obliczu przeszkody.
-    
     \begin{center}
     \begin{tikzpicture}
-        \draw[fill=gray!20] (0,0) rectangle (6,3);
-        \node at (3,1.5) {MIEJSCE NA WIDEO: Start roju i zachowania};
+        \draw[fill=gray!20] (0,0) rectangle (7,3.5);
+        \node at (3.5,1.75) {WIDEO: Rój w środowisku SITL/ArduPilot};
+    \end{tikzpicture}
+    \end{center}
+\end{frame}
+
+\begin{frame}{Rozdzielenie roju i kontrola odległości}
+    W obliczu przeszkody (np. wzniesienie, budynek), ławica musi podjąć decyzję o rozdzieleniu i późniejszym połączeniu.
+    
+    \vspace{0.3cm}
+    Rozwiązując w każdym ułamku sekundy układ równań różniczkowych, drony nieustannie utrzymują zaprogramowany margines odległości (bezpieczeństwa) od innych maszyn.
+    
+    \vspace{0.5cm}
+    \begin{center}
+    \begin{tikzpicture}
+        \draw[fill=gray!20] (0,0) rectangle (7,3.5);
+        \node[align=center] at (3.5,1.75) {WIDEO: Omijanie przeszkody (flock split) \\ oraz wizualizacja odległości między maszynami};
     \end{tikzpicture}
     \end{center}
 \end{frame}
