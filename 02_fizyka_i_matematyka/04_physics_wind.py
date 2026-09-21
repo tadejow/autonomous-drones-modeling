@@ -53,12 +53,22 @@ def main():
     plotter = DronePlotter(title="Fizyka: Walka z Wiatrem", trail_length=500)
     plotter.set_view(elev=15, azim=-60)
 
-    print("\nVehicle is hovering. Enable wind in MAVProxy console:")
-    print(" -> param set SIM_WIND_SPD 10")
+    import random
+
+    print("\nVehicle is hovering. Activating Dynamic Wind Simulation!")
     print("Watch how the vehicle changes Pitch/Roll to maintain its GPS position!\n")
 
     # Telemetry loop - runs for 30 seconds
     for i in range(150): # 30 seconds * 5 (0.2s sleep)
+        
+        # Zmiana siły i kierunku wiatru co 5 sekund (25 iteracji)
+        if i % 25 == 0:
+            new_wind_spd = random.uniform(12.0, 18.0) # Bardzo silny wiatr 12-18 m/s
+            new_wind_dir = random.uniform(0.0, 360.0) # Losowy kierunek
+            vehicle.parameters['SIM_WIND_SPD'] = new_wind_spd
+            vehicle.parameters['SIM_WIND_DIR'] = new_wind_dir
+            print(f"\n>>> SUDDEN GUST OF WIND: {new_wind_spd:.1f} m/s from {new_wind_dir:.0f}°! <<<\n")
+
         # 1. Read Euler Angles (Vehicle orientation in space)
         # Angles are returned in radians; converting to degrees for readability
         roll = math.degrees(vehicle.attitude.roll)
@@ -87,7 +97,9 @@ def main():
         
         time.sleep(0.2)
 
-    print("\nExperiment concluded. Landing...")
+    print("\nExperiment concluded. Turning off wind and Landing...")
+    vehicle.parameters['SIM_WIND_SPD'] = 0.0
+    vehicle.parameters['SIM_WIND_DIR'] = 0.0
     vehicle.mode = VehicleMode("RTL")
     
     while vehicle.location.global_relative_frame.alt > 0.5:
