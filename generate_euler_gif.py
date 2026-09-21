@@ -71,7 +71,7 @@ def update(frame):
     ax.text(b_axes[0,0]*1.1, b_axes[1,0]*1.1, b_axes[2,0]*1.1, "$X_B$ (Przód)", color='red', fontsize=12)
     
     ax.quiver(0, 0, 0, b_axes[0,1], b_axes[1,1], b_axes[2,1], color='green', linewidth=2, arrow_length_ratio=0.15)
-    ax.text(b_axes[0,1]*1.1, b_axes[1,1]*1.1, b_axes[2,1]*1.1, "$Y_B$ (Prawo)", color='green', fontsize=12)
+    ax.text(b_axes[0,1]*1.1, b_axes[1,1]*1.1, b_axes[2,1]*1.1, "$Y_B$ (Prawa)", color='green', fontsize=12)
     
     ax.quiver(0, 0, 0, b_axes[0,2], b_axes[1,2], b_axes[2,2], color='blue', linewidth=2, arrow_length_ratio=0.15)
     ax.text(b_axes[0,2]*1.1, b_axes[1,2]*1.1, b_axes[2,2]*1.1, "$Z_B$ (Dół)", color='blue', fontsize=12)
@@ -79,7 +79,7 @@ def update(frame):
 # Save frames for LaTeX
 for i in range(180):
     update(i)
-    plt.savefig(f"{out_dir}/frame_{i:03d}.png", dpi=100)
+    plt.savefig(f"{out_dir}/frame_{i:03d}.png", dpi=120, bbox_inches='tight', pad_inches=0.1)
 
 # Optional: Still save gif just in case
 ani = animation.FuncAnimation(fig, update, frames=180, interval=50)
