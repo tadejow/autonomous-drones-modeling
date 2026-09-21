@@ -177,7 +177,7 @@ def main():
         ax.plot(drone_xs, drone_ys, drone_zs, color='blue', label='Fighter Drone')
         ax.plot(target_xs, target_ys, target_zs, color='red', label='Target')
         ax.scatter(dx, dy, dz, color='blue')
-        ax.scatter(target_x, target_y, target_z, color='red', marker='o', s=100)
+        ax.text(target_x, target_y, target_z, '🎈', fontsize=25, color='red', ha='center', va='center')
         
         # Draw Line of Sight
         ax.plot([dx, target_x + target_vx * t_intercept], 
