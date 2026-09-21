@@ -116,10 +116,20 @@ def main():
 
     arm_and_takeoff(vehicle, 15.0)
     origin_point = vehicle.location.global_relative_frame
-    vehicle.airspeed = 8.0 
+    vehicle.airspeed = 15.0 
+
+    import sys
+    import os
+    # Dodajemy folder główny do ścieżki, by móc zaimportować DronePlottera
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    from pipeline.visualization.plotter import DronePlotter
 
     print(f"\nExecuting trajectory: {shape_name}")
     print(f"Total waypoints to navigate: {len(trajectory)}")
+
+    # Inicjalizacja plottera 3D (żeby ślad zostawał na długo - trail_length=2000)
+    plotter = DronePlotter(title=f"Trajectory: {shape_name}", trail_length=2000)
+    plotter.set_view(elev=90, azim=-90) # Widok z góry, by ładnie było widać np. Serduszko
 
     for idx, (d_north, d_east) in enumerate(trajectory):
         target_gps = get_location_metres(origin_point, d_north, d_east)
@@ -130,6 +140,12 @@ def main():
             current_pos = vehicle.location.global_relative_frame
             distance = get_distance_metres(current_pos, target_gps)
             
+            # Aktualizacja okienka 3D
+            loc = vehicle.location.local_frame
+            if loc.north is not None:
+                dx, dy, dz = loc.north, loc.east, -loc.down
+                plotter.update(drone_pos=(dx, dy, dz))
+            
             if distance <= 2.0:
                 break
             time.sleep(0.1) 
@@ -137,6 +153,7 @@ def main():
     print("\nTrajectory completed! Returning to Launch (RTL)...")
     vehicle.mode = VehicleMode("RTL")
     vehicle.close()
+    plotter.close()
     print("Mission finished.")
 
 if __name__ == "__main__":

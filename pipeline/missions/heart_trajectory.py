@@ -21,7 +21,7 @@ class HeartTrajectoryMission:
                 break
             time.sleep(1)
 
-        plotter = DronePlotter(title="Misja - Serce dla licealistow!", trail_length=1000)
+        plotter = DronePlotter(title="Misja - Serce dla licealistow!", trail_length=3000)
         plotter.set_view(elev=90, azim=-90) # Widok z gory
         
         # Generowanie punktów serca (równania parametryczne)
