@@ -3,38 +3,48 @@
 \begin{frame}{Dlaczego drony?}
     Bezzałogowe statki powietrzne (UAV - \textit{Unmanned Aerial Vehicles}) zrewolucjonizowały wiele dziedzin naszego życia. Ich rosnąca popularność wynika z możliwości wykonywania zadań, które dla ludzi są zbyt niebezpieczne, kosztowne lub czasochłonne.
     
-    \vspace{0.5cm}
+    \vspace{0.2cm}
     \begin{center}
-    \begin{tikzpicture}
-        \node[inner sep=0pt, draw, dashed, fill=gray!10, text width=8cm, align=center, minimum height=4cm] (img) at (0,0) {MIEJSCE NA OBRAZEK: Zastosowania dronów \\ (zmień to na dowolne zdjęcie z internetu)};
-    \end{tikzpicture}
+        \includegraphics[height=0.55\textheight]{screenshots/rodzaje-dronow.jpg}
     \end{center}
 \end{frame}
 
 \begin{frame}{Przykłady nowoczesnych zastosowań}
-    Współczesne drony to nie tylko zabawki z kamerą, ale zaawansowane latające roboty:
-    \vspace{0.3cm}
-    \begin{itemize}
-        \item \textbf{Ratownictwo i poszukiwania (SAR):} Błyskawiczne skanowanie ogromnych, niedostępnych obszarów (np. po zejściu lawiny) z użyciem kamer termowizyjnych.
-        \item \textbf{Rolnictwo precyzyjne:} Mapowanie stanu upraw za pomocą kamer multispektralnych i automatyczne, precyzyjne opryski.
-        \item \textbf{Inspekcje przemysłowe:} Autonomiczne monitorowanie uszkodzeń na wysokich turbinach wiatrowych, mostach czy rurociągach.
-        \item \textbf{Logistyka:} Błyskawiczne dostawy leków i krwi do odciętych obszarów.
-    \end{itemize}
+    Współczesne drony to nie tylko zabawki z kamerą, ale zaawansowane latające roboty.
+    \vspace{0.2cm}
+    
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \begin{itemize}
+                \item \textbf{Ratownictwo (SAR):} Błyskawiczne skanowanie obszarów z użyciem kamer termowizyjnych.
+                \item \textbf{Rolnictwo:} Mapowanie stanu upraw i precyzyjne opryski.
+                \item \textbf{Logistyka:} Błyskawiczne dostawy paczek i krwi.
+                \item \textbf{Inspekcje przemysłowe:} Monitorowanie turbin i rurociągów.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \begin{center}
+                \includegraphics[width=0.85\textwidth]{screenshots/drony-ratownictwo.jpg} \\[0.15cm]
+                \includegraphics[width=0.41\textwidth]{screenshots/10-zastosowan-dronow.jpg} \hfill
+                \includegraphics[width=0.41\textwidth]{screenshots/drony-w-transporcie.jpg}
+            \end{center}
+        \end{column}
+    \end{columns}
 \end{frame}
 
 \begin{frame}{Kiedy myślimy o dronach...}
     \begin{columns}
-        \column{0.5\textwidth}
-        Zazwyczaj wyobrażamy sobie operatora z padem w dłoni. 
+        \column{0.45\textwidth}
+        Zazwyczaj wyobrażamy sobie operatora z padem w dłoni (VLOS).
         \vspace{0.5cm}
         
         Jednak w nowoczesnym przemyśle, ratownictwie i logistyce sterowanie ręczne to przeszłość.
         
-        \column{0.5\textwidth}
+        \column{0.55\textwidth}
         \begin{center}
         \begin{tikzpicture}
-            \node[inner sep=0pt] (drone) at (0,0) {\includegraphics[width=0.8\textwidth]{example-image-a}}; % Miejsce na obrazek drona/operatora
-            \node[below=0.2cm of drone] {Od sterowania do autonomii};
+            \node[inner sep=0pt, draw=gray, thick] (drone) at (0,0) {\includegraphics[width=\textwidth]{screenshots/drony-2.png}};
+            \node[below=0.15cm of drone, font=\footnotesize] {Od sterowania ręcznego do pełnej autonomii};
         \end{tikzpicture}
         \end{center}
     \end{columns}
