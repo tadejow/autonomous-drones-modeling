@@ -34,6 +34,12 @@ def main():
         time.sleep(1)
     print("Motors armed! (Caution: propellers spinning)")
 
+    import sys, os
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    from pipeline.visualization.plotter import DronePlotter
+    plotter = DronePlotter(title="Podstawy Ruchu: Start", trail_length=1000)
+    plotter.set_view(elev=15, azim=45)
+
     # 5. Takeoff procedure
     target_altitude = 10.0
     print(f"Taking off to {target_altitude} meters...")
@@ -44,6 +50,10 @@ def main():
         current_altitude = vehicle.location.global_relative_frame.alt
         print(f" Current altitude: {current_altitude:.1f} m")
         
+        loc = vehicle.location.local_frame
+        if loc.north is not None:
+            plotter.update(drone_pos=(loc.north, loc.east, -loc.down))
+        
         # Break the loop if we reach 95% of target altitude
         if current_altitude >= target_altitude * 0.95:
             print("Target altitude reached!")
@@ -52,13 +62,25 @@ def main():
 
     # 6. Hover and return
     print("Hovering for 5 seconds...")
-    time.sleep(5)
+    for _ in range(50):
+        loc = vehicle.location.local_frame
+        if loc.north is not None:
+            plotter.update(drone_pos=(loc.north, loc.east, -loc.down))
+        time.sleep(0.1)
 
     print("Returning to Launch (RTL mode)...")
     vehicle.mode = VehicleMode("RTL")
 
+    # Monitor RTL descent
+    while vehicle.location.global_relative_frame.alt > 0.5:
+        loc = vehicle.location.local_frame
+        if loc.north is not None:
+            plotter.update(drone_pos=(loc.north, loc.east, -loc.down))
+        time.sleep(0.5)
+
     # Close connection
     vehicle.close()
+    plotter.close()
     print("Mission completed. Vehicle connection closed.")
 
 if __name__ == "__main__":

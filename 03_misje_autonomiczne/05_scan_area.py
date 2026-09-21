@@ -89,6 +89,12 @@ def main():
     clear_mission(vehicle)
     generate_lawnmower_mission(vehicle, start_location, FIELD_WIDTH, FIELD_LENGTH, SWATH_WIDTH, ALTITUDE)
 
+    import sys, os
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    from pipeline.visualization.plotter import DronePlotter
+    plotter = DronePlotter(title="Misje Autonomiczne: Skanowanie Obszaru (Lawnmower)", trail_length=2000)
+    plotter.set_view(elev=90, azim=-90)
+
     # Safe takeoff procedure in GUIDED mode
     print("\nArming motors and taking off (GUIDED mode)...")
     vehicle.mode = VehicleMode("GUIDED")
@@ -98,10 +104,14 @@ def main():
 
     vehicle.simple_takeoff(ALTITUDE)
     while True:
+        loc = vehicle.location.local_frame
+        if loc.north is not None:
+            plotter.update(drone_pos=(loc.north, loc.east, -loc.down))
+            
         if vehicle.location.global_relative_frame.alt >= ALTITUDE * 0.95:
             print("Cruising altitude reached!")
             break
-        time.sleep(1)
+        time.sleep(0.5)
 
     # Hand over control to AUTO mode
     print("Switching to AUTO mode - Autopilot takes control over the mission!")
@@ -113,14 +123,25 @@ def main():
         next_waypoint = vehicle.commands.next
         total_waypoints = vehicle.commands.count
         
+        loc = vehicle.location.local_frame
+        if loc.north is not None:
+            plotter.update(drone_pos=(loc.north, loc.east, -loc.down))
+        
         print(f"[Monitoring] Navigating to Waypoint: {next_waypoint} / {total_waypoints}")
         
         if vehicle.mode.name == "RTL":
             print("Scanning complete. Vehicle is returning to base!")
             break
-        time.sleep(2)
+        time.sleep(0.5)
+
+    while vehicle.location.global_relative_frame.alt > 0.5:
+        loc = vehicle.location.local_frame
+        if loc.north is not None:
+            plotter.update(drone_pos=(loc.north, loc.east, -loc.down))
+        time.sleep(0.5)
 
     vehicle.close()
+    plotter.close()
     print("Supervision ended. Connection closed.")
 
 if __name__ == "__main__":

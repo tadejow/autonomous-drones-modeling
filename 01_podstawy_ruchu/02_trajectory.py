@@ -86,6 +86,12 @@ def main():
         (0, 0)    # Point 4: Back to the origin
     ]
 
+    import sys, os
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    from pipeline.visualization.plotter import DronePlotter
+    plotter = DronePlotter(title="Podstawy Ruchu: Trajektoria Kwadratu", trail_length=1500)
+    plotter.set_view(elev=45, azim=-45)
+
     print("\nStarting trajectory execution (Square)...")
     vehicle.airspeed = 5.0 # Set default cruising speed to 5 m/s
 
@@ -104,17 +110,34 @@ def main():
             current_pos = vehicle.location.global_relative_frame
             distance_to_target = get_distance_metres(current_pos, target_gps)
             
+            loc = vehicle.location.local_frame
+            if loc.north is not None:
+                plotter.update(drone_pos=(loc.north, loc.east, -loc.down))
+            
             if distance_to_target <= 1.5:
                 print(f"   Point {idx+1} reached!")
-                time.sleep(2) # Short hover at the corner
+                
+                # Update during hover
+                for _ in range(20):
+                    loc = vehicle.location.local_frame
+                    if loc.north is not None:
+                        plotter.update(drone_pos=(loc.north, loc.east, -loc.down))
+                    time.sleep(0.1)
                 break
-            time.sleep(0.5)
+            time.sleep(0.2)
 
     # 4. End of mission
     print("\nTrajectory completed. Returning to launch (RTL)...")
     vehicle.mode = VehicleMode("RTL")
 
+    while vehicle.location.global_relative_frame.alt > 0.5:
+        loc = vehicle.location.local_frame
+        if loc.north is not None:
+            plotter.update(drone_pos=(loc.north, loc.east, -loc.down))
+        time.sleep(0.5)
+
     vehicle.close()
+    plotter.close()
     print("Script finished.")
 
 if __name__ == "__main__":

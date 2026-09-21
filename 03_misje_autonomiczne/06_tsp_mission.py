@@ -122,6 +122,12 @@ def main():
     cmds.add(Command(0, 0, 0, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT, mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH, 0, 1, 0, 0, 0, 0, 0, 0, 0))
     cmds.upload()
 
+    import sys, os
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    from pipeline.visualization.plotter import DronePlotter
+    plotter = DronePlotter(title="Misje Autonomiczne: Logistyka (TSP)", trail_length=2000)
+    plotter.set_view(elev=90, azim=-90)
+
     # 4. Execute the mission
     print("\nArming motors and taking off...")
     vehicle.mode = VehicleMode("GUIDED")
@@ -131,9 +137,13 @@ def main():
 
     vehicle.simple_takeoff(ALTITUDE)
     while True:
+        loc = vehicle.location.local_frame
+        if loc.north is not None:
+            plotter.update(drone_pos=(loc.north, loc.east, -loc.down))
+            
         if vehicle.location.global_relative_frame.alt >= ALTITUDE * 0.95:
             break
-        time.sleep(1)
+        time.sleep(0.5)
 
     print("Switching to AUTO mode - Executing TSP route!")
     vehicle.commands.next = 1
@@ -142,6 +152,10 @@ def main():
     while True:
         next_wp = vehicle.commands.next
         total_wps = vehicle.commands.count
+        
+        loc = vehicle.location.local_frame
+        if loc.north is not None:
+            plotter.update(drone_pos=(loc.north, loc.east, -loc.down))
         
         # Calculate pretty progress (subtracting home point and RTL command)
         current_delivery = next_wp - 1
@@ -154,9 +168,16 @@ def main():
         if vehicle.mode.name == "RTL":
             print("All points visited. Returning to base!")
             break
-        time.sleep(3)
+        time.sleep(0.5)
+
+    while vehicle.location.global_relative_frame.alt > 0.5:
+        loc = vehicle.location.local_frame
+        if loc.north is not None:
+            plotter.update(drone_pos=(loc.north, loc.east, -loc.down))
+        time.sleep(0.5)
 
     vehicle.close()
+    plotter.close()
     print("Simulation finished.")
 
 if __name__ == "__main__":

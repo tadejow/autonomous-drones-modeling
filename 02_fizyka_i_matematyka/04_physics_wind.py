@@ -47,12 +47,18 @@ def main():
     while vehicle.location.global_relative_frame.alt < 14.5:
         time.sleep(1)
 
+    import sys, os
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    from pipeline.visualization.plotter import DronePlotter
+    plotter = DronePlotter(title="Fizyka: Walka z Wiatrem", trail_length=500)
+    plotter.set_view(elev=15, azim=-60)
+
     print("\nVehicle is hovering. Enable wind in MAVProxy console:")
     print(" -> param set SIM_WIND_SPD 10")
     print("Watch how the vehicle changes Pitch/Roll to maintain its GPS position!\n")
 
     # Telemetry loop - runs for 30 seconds
-    for i in range(30):
+    for i in range(150): # 30 seconds * 5 (0.2s sleep)
         # 1. Read Euler Angles (Vehicle orientation in space)
         # Angles are returned in radians; converting to degrees for readability
         roll = math.degrees(vehicle.attitude.roll)
@@ -63,18 +69,38 @@ def main():
         vx, vy, vz = vehicle.velocity
         total_speed = math.sqrt(vx**2 + vy**2 + vz**2)
         
-        # Print physical report
-        print(f"[Second {i+1}/30] VEHICLE PHYSICS REPORT:")
-        print(f" -> Attitude : Pitch={pitch:5.1f}°, Roll={roll:5.1f}°, Yaw={yaw:5.1f}°")
-        print(f" -> Velocity : {total_speed:.2f} m/s (Vector thrust: X={vx:.1f}, Y={vy:.1f}, Z={vz:.1f})")
-        print(f" -> Est. Wind: {vehicle.wind_speed:.1f} m/s from {vehicle.wind_direction:.0f}°")
-        print("-" * 65)
+        loc = vehicle.location.local_frame
+        if loc.north is not None:
+            plotter.update(
+                drone_pos=(loc.north, loc.east, -loc.down),
+                attitude=(vehicle.attitude.pitch, vehicle.attitude.roll, vehicle.attitude.yaw)
+            )
+
+        if i % 5 == 0:
+            # Print physical report every second
+            sec = i // 5
+            print(f"[Second {sec+1}/30] VEHICLE PHYSICS REPORT:")
+            print(f" -> Attitude : Pitch={pitch:5.1f}°, Roll={roll:5.1f}°, Yaw={yaw:5.1f}°")
+            print(f" -> Velocity : {total_speed:.2f} m/s (Vector thrust: X={vx:.1f}, Y={vy:.1f}, Z={vz:.1f})")
+            print(f" -> Est. Wind: {vehicle.wind_speed:.1f} m/s from {vehicle.wind_direction:.0f}°")
+            print("-" * 65)
         
-        time.sleep(1)
+        time.sleep(0.2)
 
     print("\nExperiment concluded. Landing...")
     vehicle.mode = VehicleMode("RTL")
+    
+    while vehicle.location.global_relative_frame.alt > 0.5:
+        loc = vehicle.location.local_frame
+        if loc.north is not None:
+            plotter.update(
+                drone_pos=(loc.north, loc.east, -loc.down),
+                attitude=(vehicle.attitude.pitch, vehicle.attitude.roll, vehicle.attitude.yaw)
+            )
+        time.sleep(0.2)
+
     vehicle.close()
+    plotter.close()
 
 if __name__ == "__main__":
     main()
