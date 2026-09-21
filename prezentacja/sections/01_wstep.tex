@@ -1,5 +1,27 @@
 \section{Wstęp}
 
+\begin{frame}{Dlaczego drony?}
+    Bezzałogowe statki powietrzne (UAV - \textit{Unmanned Aerial Vehicles}) zrewolucjonizowały wiele dziedzin naszego życia. Ich rosnąca popularność wynika z możliwości wykonywania zadań, które dla ludzi są zbyt niebezpieczne, kosztowne lub czasochłonne.
+    
+    \vspace{0.5cm}
+    \begin{center}
+    \begin{tikzpicture}
+        \node[inner sep=0pt, draw, dashed, fill=gray!10, text width=8cm, align=center, minimum height=4cm] (img) at (0,0) {MIEJSCE NA OBRAZEK: Zastosowania dronów \\ (zmień to na dowolne zdjęcie z internetu)};
+    \end{tikzpicture}
+    \end{center}
+\end{frame}
+
+\begin{frame}{Przykłady nowoczesnych zastosowań}
+    Współczesne drony to nie tylko zabawki z kamerą, ale zaawansowane latające roboty:
+    \vspace{0.3cm}
+    \begin{itemize}
+        \item \textbf{Ratownictwo i poszukiwania (SAR):} Błyskawiczne skanowanie ogromnych, niedostępnych obszarów (np. po zejściu lawiny) z użyciem kamer termowizyjnych.
+        \item \textbf{Rolnictwo precyzyjne:} Mapowanie stanu upraw za pomocą kamer multispektralnych i automatyczne, precyzyjne opryski.
+        \item \textbf{Inspekcje przemysłowe:} Autonomiczne monitorowanie uszkodzeń na wysokich turbinach wiatrowych, mostach czy rurociągach.
+        \item \textbf{Logistyka:} Błyskawiczne dostawy leków i krwi do odciętych obszarów.
+    \end{itemize}
+\end{frame}
+
 \begin{frame}{Kiedy myślimy o dronach...}
     \begin{columns}
         \column{0.5\textwidth}
@@ -91,39 +113,65 @@
     \textbf{Odpowiedzią na te pytania jest matematyka.} Pojęcia z lekcji matematyki i fizyki stają się potężnymi narzędziami, z których korzystają współczesne technologie.
 \end{frame}
 
-\begin{frame}{Inżynieria lotu -- Jak drony komunikują się ze światem?}
-    Za autonomią stoi skomplikowany, ale bardzo uporządkowany proces komunikacji. 
-    Drony porozumiewają się ze stacją naziemną (GCS) za pomocą protokołu \textbf{MAVLink}.
+\begin{frame}{Architektura Systemu -- Stacja naziemna a Dron}
+    Za lotem autonomicznym stoi uporządkowany podział ról. System sterowania składa się z dwóch głównych komputerów:
     
-    \vspace{0.4cm}
+    \vspace{0.5cm}
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \textbf{1. Stacja Bazowa (GCS - Ground Control Station)}
+            \begin{itemize}
+                \item Np. programy QGroundControl, Mission Planner.
+                \item Odpowiada za planowanie misji (punkty trasy), wyświetlanie mapy i monitorowanie stanu maszyny przez operatora siedzącego bezpiecznie na ziemi.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \textbf{2. Kontroler Lotu (Autopilot)}
+            \begin{itemize}
+                \item Np. Pixhawk (część sprzętowa) + ArduPilot (część programowa).
+                \item Mózg drona. Odbiera dane z czujników (GPS, żyroskop) i bezpośrednio steruje prędkością silników, aby utrzymać maszynę stabilnie w powietrzu.
+            \end{itemize}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Język maszyn -- Protokół MAVLink}
+    Aby Stacja Bazowa i Kontroler Lotu mogły ze sobą współpracować (często na odległość kilometrów za pomocą radia), muszą mówić w tym samym języku. Do tego służy lekki protokół \textbf{MAVLink}.
+    
+    \vspace{0.2cm}
     \begin{center}
     \begin{tikzpicture}[scale=0.8, transform shape,
         box/.style={draw, rounded corners, fill=blue!10, text width=2.8cm, align=center, minimum height=1.2cm},
         arrow/.style={->, thick, >=stealth}]
         
-        % Komponenty
-        \node[box, fill=green!20] (gcs) at (0, 0) {\textbf{Stacja Bazowa (GCS)} \\ \footnotesize QGroundControl \\ Mission Planner};
+        \node[box, fill=green!20] (gcs) at (0, 0) {\textbf{Stacja Bazowa (GCS)}};
         \node[box, fill=orange!20] (mavlink) at (5.5, 0) {\textbf{Protokół MAVLink} \\ \footnotesize Telemetria, Komendy};
-        \node[box, fill=gray!20] (drone) at (11, 0) {\textbf{Kontroler Lotu} \\ \footnotesize ArduPilot (SITL) \\ Pixhawk};
+        \node[box, fill=gray!20] (drone) at (11, 0) {\textbf{Kontroler Lotu}};
         
-        % Strzałki komunikacji (góra)
-        \draw[arrow, bend left=20] (gcs.north east) to node[above, font=\scriptsize, align=center]{SET\_MODE\\(GUIDED)} (mavlink.north west);
-        \draw[arrow, bend left=20] (mavlink.north east) to node[above, font=\scriptsize, align=center]{ARM\\(Uzbrojenie)} (drone.north west);
+        \draw[arrow, bend left=20] (gcs.north east) to node[above, font=\scriptsize, align=center]{SET\_MODE (np. GUIDED)\\Wysyłanie punktów trasy} (mavlink.north west);
+        \draw[arrow, bend left=20] (mavlink.north east) to node[above, font=\scriptsize, align=center]{Rozkazy dla maszyny} (drone.north west);
         
-        % Strzałki komunikacji (dół)
-        \draw[arrow, bend left=20] (drone.south west) to node[below, font=\scriptsize, align=center]{GPS, Attitude\\(Pitch/Roll)} (mavlink.south east);
-        \draw[arrow, bend left=20] (mavlink.south west) to node[below, font=\scriptsize, align=center]{HEARTBEAT\\(Status)} (gcs.south east);
-        
-        % Proces Pre-Arm
-        \node[draw, dashed, fill=yellow!10, text width=4cm, align=left] at (11, -3) {
-            \textbf{Pre-Arm Checks:}\\
-            1. GPS Lock (3D Fix)\\
-            2. IMU Calibration\\
-            3. Barometer OK\\
-            4. Bateria > 20\%
+        \draw[arrow, bend left=20] (drone.south west) to node[below, font=\scriptsize, align=center]{Pozycja GPS, Kąty Eulera,\\Stan baterii} (mavlink.south east);
+        \draw[arrow, bend left=20] (mavlink.south west) to node[below, font=\scriptsize, align=center]{HEARTBEAT\\(Puls maszyny)} (gcs.south east);
+    \end{tikzpicture}
+    \end{center}
+    \vspace{0.2cm}
+    Kluczowym komunikatem jest \textbf{HEARTBEAT} (bicie serca) – sygnał wysyłany co sekundę. Jeśli GCS przestanie go odbierać, wie, że utracono łączność radiową i dron automatycznie zainicjuje powrót (RTL).
+\end{frame}
+
+\begin{frame}{Zanim dron poleci -- Pre-Arm Checks}
+    Bezpieczeństwo to podstawa. Zanim silniki zostaną "uzbrojone" (komenda ARM) i zaczną się kręcić, kontroler lotu wykonuje serię rygorystycznych testów fizycznych i matematycznych. Jeśli choć jeden zawiedzie, dron nie pozwoli na start.
+    
+    \vspace{0.3cm}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.9]
+        \node[draw, thick, fill=yellow!10, text width=11cm, align=left, inner sep=0.4cm, rounded corners] (checks) at (0,0) {
+            \textbf{Filtry bezpieczeństwa (Pre-Arm Checks):}\\[0.3cm]
+            \textcolor{green!60!black}{\textbf{\checkmark} GPS Lock (3D Fix)} -- Czy złapaliśmy sygnał z co najmniej 6 satelitów i precyzję trójwymiarową? Bez tego dron nie wie gdzie jest.\\[0.1cm]
+            \textcolor{green!60!black}{\textbf{\checkmark} IMU Calibration} -- Czy akcelerometry i żyroskopy zgadzają się co do tego, gdzie znajduje się środek Ziemi ("dół")?\\[0.1cm]
+            \textcolor{green!60!black}{\textbf{\checkmark} Compass Variance} -- Czy pole magnetyczne nie jest zaburzone (np. przez bliskość transformatora lub metalowego dachu)?\\[0.1cm]
+            \textcolor{red}{\textbf{\texttimes} Battery Failsafe} -- Czy napięcie baterii wystarczy na bezpieczny lot i powrót?
         };
-        \draw[->, dashed, thick] (11, -1.8) -- (11, -0.8);
-        
     \end{tikzpicture}
     \end{center}
 \end{frame}

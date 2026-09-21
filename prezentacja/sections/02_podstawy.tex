@@ -73,16 +73,38 @@
     \end{center}
 \end{frame}
 
-\begin{frame}{Start drona -- pierwszy kod}
+\begin{frame}{Start drona -- z teorii do praktyki}
     Korzystając z lokalnego układu NED, polecamy maszynie polecieć 10 metrów na Północ i 5 metrów w Górę ($D = -5$).
     
-    \vspace{0.5cm}
-    \textbf{Demonstracja wideo:} Start i lot po prostej trajektorii.
-    
-    \begin{center}
-    \begin{tikzpicture}
-        \draw[fill=gray!20] (0,0) rectangle (6,3);
-        \node at (3,1.5) {MIEJSCE NA WIDEO: Start i prosta trajektoria};
-    \end{tikzpicture}
-    \end{center}
+    \vspace{0.4cm}
+    \begin{columns}
+        \begin{column}{0.4\textwidth}
+            \textbf{Instrukcja przemieszczenia:}
+            \begin{align*}
+                \Delta X (N) &= 10 \\
+                \Delta Y (E) &= 0 \\
+                \Delta Z (D) &= -5
+            \end{align*}
+            W ten sposób, prosta wektoryzacja z matematyki bezpośrednio steruje fizycznym obiektem w przestrzeni trójwymiarowej.
+        \end{column}
+        \begin{column}{0.6\textwidth}
+            \begin{center}
+            \begin{tikzpicture}[scale=1.5, x={(0.866cm, -0.5cm)}, y={(0.866cm, 0.5cm)}, z={(0cm, -1cm)}]
+                % Osie NED
+                \draw[->, thick, red] (0,0,0) -- (2.5,0,0) node[anchor=west]{$N$};
+                \draw[->, thick, green!60!black] (0,0,0) -- (0,1.5,0) node[anchor=south]{$E$};
+                \draw[->, thick, blue] (0,0,0) -- (0,0,1.5) node[anchor=north]{$D$};
+                
+                % Wektor ruchu
+                \filldraw[black] (0,0,0) circle (1.5pt) node[anchor=north east]{Start $(0,0,0)$};
+                \draw[->, thick, orange, line width=1.5pt] (0,0,0) -- (2, 0, -1) node[midway, sloped, above, font=\footnotesize] {Wektor ruchu};
+                \filldraw[orange] (2, 0, -1) circle (1.5pt) node[anchor=south west]{Cel $(10, 0, -5)$};
+                
+                % Składowe
+                \draw[dashed, gray] (0,0,0) -- (2,0,0) node[midway, below left] {$N=10$};
+                \draw[dashed, gray] (2,0,0) -- (2,0,-1) node[midway, right] {$D=-5$ (Góra)};
+            \end{tikzpicture}
+            \end{center}
+        \end{column}
+    \end{columns}
 \end{frame}
