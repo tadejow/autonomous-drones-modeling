@@ -128,8 +128,9 @@
         \begin{column}{0.5\textwidth}
             \textbf{2. Kontroler Lotu (Autopilot)}
             \begin{itemize}
-                \item Np. Pixhawk (część sprzętowa) + ArduPilot (część programowa).
-                \item Mózg drona. Odbiera dane z czujników (GPS, żyroskop) i bezpośrednio steruje prędkością silników, aby utrzymać maszynę stabilnie w powietrzu.
+                \item W naszym projekcie nie ma fizycznego układu elektronicznego (jak Pixhawk).
+                \item Wykorzystujemy symulator \textbf{SITL (Software-In-The-Loop)}.
+                \item System \textbf{ArduPilot} działa jako lokalny proces na komputerze. Rozwiązuje na żywo równania matematyczne i fizyczne (symulując m.in. żyroskop i GPS), zastępując prawdziwego drona.
             \end{itemize}
         \end{column}
     \end{columns}
@@ -146,7 +147,7 @@
         
         \node[box, fill=green!20] (gcs) at (0, 0) {\textbf{Stacja Bazowa (GCS)}};
         \node[box, fill=orange!20] (mavlink) at (5.5, 0) {\textbf{Protokół MAVLink} \\ \footnotesize Telemetria, Komendy};
-        \node[box, fill=gray!20] (drone) at (11, 0) {\textbf{Kontroler Lotu}};
+        \node[box, fill=gray!20] (drone) at (11, 0) {\textbf{Symulator (SITL)} \\ \footnotesize ArduPilot};
         
         \draw[arrow, bend left=20] (gcs.north east) to node[above, font=\scriptsize, align=center]{SET\_MODE (np. GUIDED)\\Wysyłanie punktów trasy} (mavlink.north west);
         \draw[arrow, bend left=20] (mavlink.north east) to node[above, font=\scriptsize, align=center]{Rozkazy dla maszyny} (drone.north west);
