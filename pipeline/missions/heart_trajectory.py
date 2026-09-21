@@ -12,7 +12,7 @@ class HeartTrajectoryMission:
 
     def run(self):
         self.manager.arm_and_takeoff(15.0)
-        self.vehicle.groundspeed = 10.0 # Prędkość 10 m/s
+        self.vehicle.groundspeed = 15.0 # Prędkość zwiększona do 15 m/s
         
         print("Czekam na stabilny sygnał GPS...")
         while True:
