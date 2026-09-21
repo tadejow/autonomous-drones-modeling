@@ -64,10 +64,10 @@
             \draw[->, >=stealth, blue, thick] (0.6, 0) arc (0:-270:0.6);
         \end{scope}
 
-        % Etykiety kątów (ustawione na sztywno w 2D, aby uniknąć kolizji)
-        \node[red, font=\footnotesize, fill=white, inner sep=1pt] at (-2.3, -1.8) {Przechylenie / Roll ($\phi$)};
-        \node[green!60!black, font=\footnotesize, fill=white, inner sep=1pt] at (2.5, -0.8) {Pochylenie / Pitch ($\theta$)};
-        \node[blue, font=\footnotesize, fill=white, inner sep=1pt] at (1.2, -2.2) {Odchylenie / Yaw ($\psi$)};
+        % Etykiety kątów (ustawione pod osiami za pomocą współrzędnych 3D)
+        \node[red, font=\footnotesize, fill=white, inner sep=1pt] at (2.0, 0, -0.8) {Przechylenie / Roll ($\phi$)};
+        \node[green!60!black, font=\footnotesize, fill=white, inner sep=1pt] at (0, 2.0, -0.8) {Pochylenie / Pitch ($\theta$)};
+        \node[blue, font=\footnotesize, fill=white, inner sep=1pt] at (0, 1.0, -3.0) {Odchylenie / Yaw ($\psi$)};
 
     \end{tikzpicture}
     \end{center}
