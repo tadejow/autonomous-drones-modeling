@@ -31,11 +31,17 @@ def get_distance_metres(loc1: LocationGlobalRelative, loc2: LocationGlobalRelati
     return math.sqrt((d_lat**2) + (d_lon**2)) * 1.113195e5
 
 def arm_and_takeoff(vehicle, target_altitude: float) -> None:
-    print("Arming and taking off...")
+    print("Oczekiwanie na gotowość drona (GPS Lock i inicjalizacja EKF)...")
+    while not vehicle.is_armable:
+        time.sleep(1)
+        
+    print("Uzbrajanie silników i start...")
     vehicle.mode = VehicleMode("GUIDED")
     vehicle.armed = True
     while not vehicle.armed:
         time.sleep(1)
+        
+    print(f"Odlot na wysokość: {target_altitude}m")
     vehicle.simple_takeoff(target_altitude)
     while True:
         if vehicle.location.global_relative_frame.alt >= target_altitude * 0.95:
