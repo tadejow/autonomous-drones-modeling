@@ -70,3 +70,4 @@ seed = 0
 trail_length = 300
 pause_s = 0.05
 topdown = false
+window_layout = "auto"           # "auto", "right_half" (next to the MAVProxy map), "maximized", "none"

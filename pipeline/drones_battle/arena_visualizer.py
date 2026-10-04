@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import queue
+import subprocess
 from collections import deque
 from typing import Any, Optional
 
@@ -47,6 +48,21 @@ def _sphere(center_enu: tuple[float, float, float], radius: float, steps: int = 
     )
 
 
+def _work_area(window: Any) -> tuple[int, int, int, int]:
+    """Usable screen area (without panels) as ``(x, y, width, height)``."""
+    try:
+        output = subprocess.run(
+            ["xprop", "-root", "_NET_WORKAREA"], capture_output=True, text=True, timeout=2, check=True
+        ).stdout
+        values = [int(v) for v in output.split("=", 1)[1].replace(",", " ").split()[:4]]
+        if len(values) == 4 and values[2] > 0 and values[3] > 0:
+            return values[0], values[1], values[2], values[3]
+    except (OSError, subprocess.SubprocessError, IndexError, ValueError):
+        pass
+    # Fallback (e.g. Windows): whole screen minus a typical taskbar.
+    return 0, 0, int(window.winfo_screenwidth()), int(window.winfo_screenheight()) - 48
+
+
 class ArenaVisualizer:
     def __init__(
         self,
@@ -54,6 +70,7 @@ class ArenaVisualizer:
         trail_length: Optional[int] = None,
         topdown: Optional[bool] = None,
         title: str = "Drone Battle Arena",
+        window_layout: Optional[str] = None,
     ) -> None:
         self.config = config or load_config()
         viz = self.config.visualization
@@ -84,6 +101,38 @@ class ArenaVisualizer:
         self.trails: dict[tuple[int, int], Any] = {}
         self.markers: dict[tuple[int, int], Any] = {}
         self.hit_artists: list[Any] = []
+        self._pending_layout: Optional[str] = window_layout or viz.window_layout
+
+    # ------------------------------------------------------------------ window
+    def apply_window_layout(self) -> None:
+        """Puts the Tk window on the right half of the work area (or maximizes it).
+
+        ``start_arena.sh`` places the MAVProxy map on the left half, so together
+        the two windows fill the screen. Runs once, after the window is shown:
+        a geometry set earlier is overridden when matplotlib maps the window.
+        """
+        layout = self._pending_layout
+        window = getattr(self.fig.canvas.manager, "window", None)
+        if layout is None or window is None or not hasattr(window, "wm_geometry"):
+            self._pending_layout = None
+            return
+        if not window.winfo_ismapped():
+            return
+        self._pending_layout = None
+        if layout == "maximized":
+            try:
+                window.state("zoomed")  # Windows
+            except Exception:  # noqa: BLE001 - X11 window managers use the -zoomed attribute
+                try:
+                    window.attributes("-zoomed", True)
+                except Exception:  # noqa: BLE001
+                    pass
+        elif layout == "right_half":
+            x, y, width, height = _work_area(window)
+            half = width // 2
+            # Height minus a title bar; the WM adds decorations outside the geometry.
+            window.wm_geometry(f"{width - half}x{max(height - 32, 200)}+{x + half}+{y}")
+        window.update()
 
     # ------------------------------------------------------------------ setup
     def _limits(self) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]]:
@@ -208,6 +257,7 @@ class ArenaVisualizer:
         """Draws one frame and lets the GUI breathe (``plt.pause``), as in the specification."""
         self.render(drones_state, hud)
         plt.pause(self.pause_s)
+        self.apply_window_layout()
 
     def is_open(self) -> bool:
         return plt.fignum_exists(self.fig.number)
@@ -218,13 +268,14 @@ class ArenaVisualizer:
 
 
 # ---------------------------------------------------------------------- process wrapper
-def _visualizer_main(config: ArenaConfig, frames: Any, keep_open: bool) -> None:
-    visualizer = ArenaVisualizer(config)
+def _visualizer_main(config: ArenaConfig, frames: Any, keep_open: bool, window_layout: str) -> None:
+    visualizer = ArenaVisualizer(config, window_layout=window_layout)
     while visualizer.is_open():
         try:
             item = frames.get(timeout=0.005)
         except queue.Empty:
             plt.pause(visualizer.pause_s)
+            visualizer.apply_window_layout()
             continue
         if item is None:
             break
@@ -241,11 +292,14 @@ def _visualizer_main(config: ArenaConfig, frames: Any, keep_open: bool) -> None:
 class VisualizerProcess:
     """Runs :class:`ArenaVisualizer` in a separate process fed with the newest frame only."""
 
-    def __init__(self, config: ArenaConfig, keep_open: bool = True) -> None:
+    def __init__(self, config: ArenaConfig, keep_open: bool = True, window_layout: str = "none") -> None:
         context = mp.get_context("spawn")
         self._frames = context.Queue(maxsize=1)
         self._process = context.Process(
-            target=_visualizer_main, args=(config, self._frames, keep_open), name="arena-visualizer", daemon=True
+            target=_visualizer_main,
+            args=(config, self._frames, keep_open, window_layout),
+            name="arena-visualizer",
+            daemon=True,
         )
         self._process.start()
 

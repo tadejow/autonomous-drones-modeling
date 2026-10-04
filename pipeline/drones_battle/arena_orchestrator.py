@@ -244,7 +244,10 @@ def run_match(
         if visualize:
             from pipeline.drones_battle.arena_visualizer import VisualizerProcess
 
-            visualizer = VisualizerProcess(config)
+            layout = config.visualization.window_layout
+            if layout == "auto":
+                layout = "right_half" if backend_name == "sitl" else "maximized"
+            visualizer = VisualizerProcess(config, window_layout=layout)
         if backend.realtime:
             for remaining in range(int(config.game.countdown_s), 0, -1):
                 if verbose:

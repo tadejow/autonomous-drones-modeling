@@ -78,7 +78,9 @@ def main(argv: Optional[list[str]] = None) -> None:
     config = _config_from_header(header)
     huds = build_huds(frames, config, result)
     title = f"Replay: {header.get('attacker', '?')} vs {header.get('defender', '?')}"
-    visualizer = ArenaVisualizer(config, topdown=args.topdown or None, title=title)
+    visualizer = ArenaVisualizer(
+        config, topdown=args.topdown or None, title=title, window_layout=None if args.save else "maximized"
+    )
 
     def draw(index: int) -> None:
         visualizer.history.clear()
@@ -126,6 +128,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             slider.set_val(state["index"])
             state["internal"] = False
         plt.pause(1.0 / args.fps)
+        visualizer.apply_window_layout()
 
 
 if __name__ == "__main__":

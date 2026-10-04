@@ -127,6 +127,9 @@ class VisualizationSection:
     trail_length: int = 300
     pause_s: float = 0.05
     topdown: bool = False
+    # Where the 3D window opens: "auto" = right half of the screen next to the
+    # MAVProxy map (SITL) or maximized (kinematic); also "right_half", "maximized", "none".
+    window_layout: Literal["auto", "right_half", "maximized", "none"] = "auto"
 
 
 @dataclass(frozen=True)
