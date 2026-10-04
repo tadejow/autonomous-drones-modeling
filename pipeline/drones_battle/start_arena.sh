@@ -18,6 +18,8 @@
 #   ARDUPILOT_DIR   default ~/ardupilot
 #   PYTHON          default python3
 #   ARENA_NO_MAP=1  skip the MAVProxy map
+#   ARENA_CONFIG    configuration file (default arena_config.toml), e.g. arena_config_5v5.toml;
+#                   pass the same file to the orchestrator with --config
 set -euo pipefail
 
 ARENA_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -103,12 +105,15 @@ place_map_window() {  # waits for the MAVProxy map and puts it on the left half 
 }
 
 # --- read the layout from the configuration ----------------------------------
-LAYOUT="$(cd "$REPO_DIR" && "$PYTHON" -m pipeline.drones_battle.core.layout)"
+CONFIG_ARGS=()
+[[ -n "${ARENA_CONFIG:-}" ]] && CONFIG_ARGS=(--config "$(cd "$(dirname "$ARENA_CONFIG")" && pwd)/$(basename "$ARENA_CONFIG")")
+LAYOUT="$(cd "$REPO_DIR" && "$PYTHON" -m pipeline.drones_battle.core.layout "${CONFIG_ARGS[@]}")"
 MODE="$(echo "$LAYOUT" | awk '/^mode/ {print $2}')"
 MAP_MASTERS=""
-echo "Starting 6 SITL instances (mode: $MODE)..."
+COUNT="$(echo "$LAYOUT" | grep -vc '^mode')"
+echo "Starting $COUNT SITL instances (mode: $MODE)..."
 
-while read -r instance sysid lat lon alt heading port map_port; do
+while read -r instance sysid lat lon alt heading port map_port team; do
     if [[ "$MODE" == "tcp" ]]; then
         outputs="--no-mavproxy"
         MAP_MASTERS+=" --master=tcp:127.0.0.1:$map_port"
@@ -116,7 +121,6 @@ while read -r instance sysid lat lon alt heading port map_port; do
         outputs="--out=udp:127.0.0.1:$port --out=udp:127.0.0.1:$map_port"
         MAP_MASTERS+=" --master=udp:127.0.0.1:$map_port"
     fi
-    team="attacker"; [[ "$sysid" -ge 4 ]] && team="defender"
     echo "  SysID $sysid ($team): $lat, $lon, heading $heading -> port $port"
     launch "sitl_$sysid" "cd $ARDUPILOT_DIR/ArduCopter && $SIM -v ArduCopter --no-rebuild -f quad \
         -I$instance --sysid $sysid -l $lat,$lon,$alt,$heading \
@@ -136,5 +140,5 @@ minimize_arena_terminals
 echo
 echo "Arena is starting (simulator terminals are minimized in the taskbar)."
 echo "When all drones are visible on the map, run (from $REPO_DIR):"
-echo "  $PYTHON -m pipeline.drones_battle.arena_orchestrator --backend sitl"
+echo "  $PYTHON -m pipeline.drones_battle.arena_orchestrator --backend sitl ${ARENA_CONFIG:+--config $ARENA_CONFIG}"
 echo "Stop everything with: $ARENA_DIR/stop_arena.sh"

@@ -1,0 +1,16 @@
+# Drone battle 5 vs 5. Only the differences from the defaults (core/config.py) are listed.
+#   python -m pipeline.drones_battle.arena_orchestrator --backend kinematic --config pipeline/drones_battle/arena_config_5v5.toml
+#   python -m pipeline.drones_battle.tournament --config pipeline/drones_battle/arena_config_5v5.toml
+# SITL: start_arena.sh reads ARENA_CONFIG, e.g.
+#   ARENA_CONFIG=pipeline/drones_battle/arena_config_5v5.toml ./pipeline/drones_battle/start_arena.sh
+# SITL ports: orchestrator 14550..14640, map 14650..14740 (step 10 per drone).
+
+[arena]
+start_spacing_m = 6.0
+east_min_m = -80.0
+east_max_m = 80.0
+
+[game]
+attacker_ids = [1, 2, 3, 4, 5]
+defender_ids = [6, 7, 8, 9, 10]
+mutual_kill = true

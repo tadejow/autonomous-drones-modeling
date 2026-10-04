@@ -83,7 +83,7 @@ class ArenaVisualizer:
         plt.ion()
         columns = 3 if self.topdown else 2
         self.fig = plt.figure(figsize=(8 * columns, 8))
-        self.fig.subplots_adjust(left=0.0, right=1.0, bottom=0.06, top=0.9, wspace=0.0)
+        self.fig.subplots_adjust(left=0.0, right=1.0, bottom=0.14, top=0.9, wspace=0.0)
         try:
             self.fig.canvas.manager.set_window_title(title)
         except AttributeError:
@@ -97,7 +97,7 @@ class ArenaVisualizer:
             self._setup_top(self.ax_top)
 
         self.hud_text = self.fig.suptitle("", fontsize=14, fontweight="bold")
-        self.events_text = self.fig.text(0.01, 0.01, "", fontsize=10, family="monospace", va="bottom")
+        self.events_text = self.fig.text(0.01, 0.005, "", fontsize=9, family="monospace", va="bottom")
         self.trails: dict[tuple[int, int], Any] = {}
         self.markers: dict[tuple[int, int], Any] = {}
         self.hit_artists: list[Any] = []

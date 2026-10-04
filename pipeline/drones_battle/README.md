@@ -83,6 +83,40 @@ python -m pipeline.drones_battle.arena_orchestrator --backend kinematic --fast -
 python -m pipeline.drones_battle.replay walka.jsonl --save walka.gif --topdown --step 2 --fps 5
 ```
 
+### Walki 5 vs 5
+
+Konfiguracja `arena_config_5v5.toml` (atakujący SysID 1–5, obrońcy 6–10) działa z tym samym kodem; wystarczy dodać `--config`:
+
+```bash
+python -m pipeline.drones_battle.arena_orchestrator --backend kinematic --config pipeline/drones_battle/arena_config_5v5.toml
+python -m pipeline.drones_battle.tournament --config pipeline/drones_battle/arena_config_5v5.toml --rounds 6
+# SITL: 10 symulatorów (porty 14550..14640, mapa 14650..14740)
+ARENA_CONFIG=pipeline/drones_battle/arena_config_5v5.toml ./pipeline/drones_battle/start_arena.sh
+python -m pipeline.drones_battle.arena_orchestrator --backend sitl --config pipeline/drones_battle/arena_config_5v5.toml
+```
+
+| Plik | Atak → obrona | Wynik | Co widać |
+|---|---|---|---|
+| [01](examples/5v5/01_pincer_vs_pincer.gif) | pincer → pincer | atakujący, 21,7 s | atak kleszczowy: zbiórka na okręgu 42 m i jednoczesne uderzenie z pięciu kierunków przeciążają obronę strefową |
+| [02](examples/5v5/02_wolfpack_vs_hunters.gif) | wolfpack → hunters | atakujący, 19,5 s | „tarany” wymieniają się z obrońcami 1:1, a biegacz z flanki wchodzi w lukę |
+| [03](examples/5v5/03_hunters_vs_pincer.gif) | hunters → pincer | obrońcy, 25,1 s | długa walka: obrona strefowa z rezerwą łapie atakujących omijających straż |
+| [04](examples/5v5/04_hunters_vs_wolfpack.gif) | hunters → wolfpack | atakujący, 18,6 s | odpychanie od obrońców przebija linię zaporową |
+| [05](examples/5v5/05_wolfpack_vs_pincer.gif) | wolfpack → pincer | obrońcy, 21,1 s | obrońcy z posterunków nie dają się staranować, biegacze giną przy bazie |
+
+![Atak kleszczowy 5 vs 5](examples/5v5/01_pincer_vs_pincer.gif)
+
+### Drużyny przykładowe (`teams/`)
+
+| Drużyna | Atak | Obrona |
+|---|---|---|
+| `baseline` | szablon: prosto do celu | szablon: pościg za najbliższym |
+| `hunters` | przyciąganie do celu + odpychanie kulombowskie od obrońców | optymalny przydział (permutacje, minimax czasu) + przechwycenie predykcyjne |
+| `tricksters` | dwóch flankujących jako przynęta, opóźniony biegacz | straż na linii baza–atakujący, uderzenie z bliska |
+| `pincer` | zbiórka na okręgu wokół celu i jednoczesne uderzenie z wielu kierunków | obrona strefowa: posterunki na półokręgu + rezerwa przy bazie, ranking zagrożeń po czasie do celu |
+| `wolfpack` | „tarany” celowo zderzają się z obrońcami (kamikaze działa w obie strony), biegacze czekają na flankach | linia zaporowa, która wysyła obrońcę tylko do realnych zagrożeń (czas do celu < 14 s lub taran) |
+
+Turniej 5 vs 5 (6 rund na parę, 150 meczów): hunters 150 pkt, pincer 111, wolfpack 96, tricksters 75, baseline 18; atakujący wygrywają 39% meczów.
+
 ---
 
 ## Zasady gry
@@ -159,7 +193,7 @@ pipeline/drones_battle/
 ├── backends/
 │   ├── kinematic.py        # model punktu materialnego, bez SITL
 │   └── sitl.py             # DroneKit + ArduPilot SITL
-├── teams/                  # baseline, hunters, tricksters
+├── teams/                  # baseline, hunters, tricksters, pincer, wolfpack
 └── tests/                  # pytest, bez SITL
 ```
 
@@ -209,7 +243,7 @@ Turniej z 10 rundami na parę (losowe przesunięcie startu do 3 m), przykładowe
 
 | Ustawienie | Wygrane atakujących |
 |---|---:|
-| domyślne: obrońcy kamikaze, 10 m/s obie strony | 41% |
+| domyślne: obrońcy kamikaze, 10 m/s obie strony | 41% (3 pierwsze drużyny), 33% (wszystkie 5) |
 | kamikaze, `defender_max_speed_mps = 9` | 44% |
 | obrońcy nieśmiertelni (`mutual_kill = false`), 10 m/s | 31% |
 | obrońcy nieśmiertelni, `defender_max_speed_mps = 9` | 42% |

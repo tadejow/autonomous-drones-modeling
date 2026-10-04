@@ -15,8 +15,9 @@ fi
 
 pkill -f "sim_vehicle.py.*$ARENA_DIR/arena.parm" 2>/dev/null
 pkill -f "arducopter.*$ARENA_DIR/arena.parm" 2>/dev/null
-pkill -f "mavproxy.py.*127.0.0.1:14(55|56|57|58|59|60)0" 2>/dev/null
-pkill -f "mavproxy.py.*--master=(udp:127.0.0.1:14(65|66|67|68|69|70)0|tcp:127.0.0.1:5(76|77|78|79|80|81)2)" 2>/dev/null
+# Up to 10 drones: orchestrator ports 14550..14640, map ports 14650..14740 or tcp 5762..5852.
+pkill -f "mavproxy.py.*127.0.0.1:14(5[5-9]|6[0-4])0" 2>/dev/null
+pkill -f "mavproxy.py.*--master=(udp:127.0.0.1:14(6[5-9]|7[0-4])0|tcp:127.0.0.1:5(7[6-9]|8[0-5])2)" 2>/dev/null
 sleep 1
 pkill -9 -f "arducopter.*$ARENA_DIR/arena.parm" 2>/dev/null
 echo "Done."
