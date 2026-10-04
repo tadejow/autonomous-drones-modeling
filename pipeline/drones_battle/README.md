@@ -37,6 +37,20 @@ python -m pipeline.drones_battle.arena_orchestrator --backend sitl   # okna 2 i 
 
 `start_arena.sh` domyślnie otwiera każdy symulator w `xterm -hold`. Inny terminal: `ARENA_TERMINAL="xfce4-terminal --disable-server -x"`, bez okien (logi w `logs/`): `ARENA_TERMINAL=""`. Skrypt nigdy nie zabija terminali użytkownika (`stop_arena.sh` korzysta z pliku `.arena_pids`).
 
+### Na komputerze w pracowni (zdalnie przez labgate)
+
+Labgate daje pełny pulpit, więc wszystko działa jak lokalnie. Pulpity w pracowniach używają XFCE, dlatego zamiast `xterm` warto wskazać `xfce4-terminal` (tak jak skrypty z modułu 05):
+
+```bash
+cd ~/autonomous-drones-modeling && git checkout claude/project-thread-ogz232
+source venv/bin/activate          # pierwszy raz: python3 -m venv venv && pip install -r requirements.txt
+pip install tomli                 # tylko dla Pythona < 3.11
+ARENA_TERMINAL="xfce4-terminal --disable-server -x" ./pipeline/drones_battle/start_arena.sh
+python -m pipeline.drones_battle.arena_orchestrator --backend sitl
+```
+
+Na ekranie pojawi się 6 terminali SITL, mapa MAVProxy (okno 1) i figura z dwoma widokami 3D (okna 2 i 3). Jeśli obraz przez labgate jest za wolny, dodaj `--no-viz`, a mecz obejrzyj potem przez `replay`.
+
 ### Powtórka meczu
 
 Każdy mecz jest zapisywany w `matches/<data>.jsonl`.
