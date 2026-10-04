@@ -1,0 +1,3 @@
+# Optional team description shown in the arena GUI.
+name = "Nazwa drużyny"
+authors = ["Imię Nazwisko (300538)"]

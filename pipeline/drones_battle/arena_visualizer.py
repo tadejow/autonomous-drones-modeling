@@ -18,6 +18,7 @@ from __future__ import annotations
 import multiprocessing as mp
 import queue
 import subprocess
+import time
 from collections import deque
 from typing import Any, Optional
 
@@ -83,7 +84,7 @@ class ArenaVisualizer:
         plt.ion()
         columns = 3 if self.topdown else 2
         self.fig = plt.figure(figsize=(8 * columns, 8))
-        self.fig.subplots_adjust(left=0.0, right=1.0, bottom=0.06, top=0.9, wspace=0.0)
+        self.fig.subplots_adjust(left=0.0, right=1.0, bottom=0.14, top=0.84, wspace=0.0)
         try:
             self.fig.canvas.manager.set_window_title(title)
         except AttributeError:
@@ -97,7 +98,7 @@ class ArenaVisualizer:
             self._setup_top(self.ax_top)
 
         self.hud_text = self.fig.suptitle("", fontsize=14, fontweight="bold")
-        self.events_text = self.fig.text(0.01, 0.01, "", fontsize=10, family="monospace", va="bottom")
+        self.events_text = self.fig.text(0.01, 0.005, "", fontsize=9, family="monospace", va="bottom")
         self.trails: dict[tuple[int, int], Any] = {}
         self.markers: dict[tuple[int, int], Any] = {}
         self.hit_artists: list[Any] = []
@@ -239,6 +240,8 @@ class ArenaVisualizer:
         )
         if hud.get("banner"):
             text = f"{hud['banner']}\n{text}"
+        if hud.get("title"):
+            text = f"{hud['title']}\n{text}"
         self.hud_text.set_text(text)
         self.events_text.set_text("\n".join(hud.get("events", [])[-5:]))
         for artist in self.hit_artists:
@@ -267,41 +270,103 @@ class ArenaVisualizer:
         plt.close(self.fig)
 
 
+
 # ---------------------------------------------------------------------- process wrapper
-def _visualizer_main(config: ArenaConfig, frames: Any, keep_open: bool, window_layout: str) -> None:
-    visualizer = ArenaVisualizer(config, window_layout=window_layout)
-    while visualizer.is_open():
+def _drain(channel: Any) -> None:
+    while True:
         try:
-            item = frames.get(timeout=0.005)
+            channel.get_nowait()
+        except queue.Empty:
+            return
+
+
+def _visualizer_main(
+    config: ArenaConfig, frames: Any, control: Any, ready: Any, closed: Any, window_layout: str, title: str
+) -> None:
+    """Child process: one window, reused for every match until ``stop`` arrives.
+
+    ``frames`` (size 1) carries only the newest state; ``control`` carries
+    ``reset`` (new match), ``final`` (result frame) and ``stop``, which must
+    never be dropped, hence the separate queue.
+    """
+    visualizer: Optional[ArenaVisualizer] = None
+    frozen = False
+
+    def open_window(window_title: str) -> ArenaVisualizer:
+        if visualizer is not None and visualizer.is_open():
+            visualizer.close()
+        fresh = ArenaVisualizer(config, window_layout=window_layout, title=window_title)
+        plt.pause(0.05)
+        fresh.apply_window_layout()
+        closed.clear()
+        ready.set()
+        return fresh
+
+    visualizer = open_window(title)
+    while True:
+        try:
+            command = control.get_nowait()
+        except queue.Empty:
+            command = None
+        if command is not None:
+            if command[0] == "stop":
+                break
+            if command[0] == "reset":
+                _drain(frames)
+                visualizer = open_window(command[1])
+                frozen = False
+            elif command[0] == "final":
+                _drain(frames)
+                frozen = True
+                if visualizer.is_open():
+                    visualizer.update_frame(command[1], command[2])
+            continue
+        if not visualizer.is_open():
+            closed.set()
+            time.sleep(0.05)
+            continue
+        try:
+            _, drones, hud = frames.get(timeout=0.005)
         except queue.Empty:
             plt.pause(visualizer.pause_s)
             visualizer.apply_window_layout()
             continue
-        if item is None:
-            break
-        kind, drones, hud = item
-        visualizer.update_frame(drones, hud)
-        if kind == "final":
-            if keep_open and visualizer.is_open():
-                plt.ioff()
-                plt.show()
-            break
-    visualizer.close()
+        if not frozen:
+            visualizer.update_frame(drones, hud)
+    if visualizer is not None and visualizer.is_open():
+        visualizer.close()
 
 
 class VisualizerProcess:
-    """Runs :class:`ArenaVisualizer` in a separate process fed with the newest frame only."""
+    """Runs :class:`ArenaVisualizer` in a separate process fed with the newest frame only.
 
-    def __init__(self, config: ArenaConfig, keep_open: bool = True, window_layout: str = "none") -> None:
+    One process (and one window) can show many matches in a row: call
+    :meth:`new_match` before each of them, which is what tournaments do.
+    """
+
+    def __init__(self, config: ArenaConfig, window_layout: str = "none", title: str = "Drone Battle Arena") -> None:
         context = mp.get_context("spawn")
         self._frames = context.Queue(maxsize=1)
+        self._control = context.Queue()
+        self._ready = context.Event()
+        self._closed = context.Event()
         self._process = context.Process(
             target=_visualizer_main,
-            args=(config, self._frames, keep_open, window_layout),
+            args=(config, self._frames, self._control, self._ready, self._closed, window_layout, title),
             name="arena-visualizer",
             daemon=True,
         )
         self._process.start()
+
+    def wait_ready(self, timeout: float = 30.0) -> bool:
+        """Blocks until the window is on screen, so the first seconds of a match are not lost."""
+        return self._ready.wait(timeout)
+
+    def new_match(self, title: str, timeout: float = 30.0) -> bool:
+        """Clears the window (trails, hits) for the next match and waits until it is shown."""
+        self._ready.clear()
+        self._control.put(("reset", title))
+        return self.wait_ready(timeout)
 
     def publish(self, drones: dict[Any, Any], hud: dict[str, Any]) -> None:
         item = ("frame", drones, hud)
@@ -317,17 +382,23 @@ class VisualizerProcess:
             except queue.Full:
                 pass
 
-    def finish(self, drones: dict[Any, Any], hud: dict[str, Any], wait: bool = True) -> None:
-        try:
-            self._frames.get_nowait()
-        except queue.Empty:
-            pass
-        self._frames.put(("final", drones, hud))
-        if wait:
-            print("Close the plot window to exit.")
-            self._process.join()
+    def show_final(self, drones: dict[Any, Any], hud: dict[str, Any]) -> None:
+        """Last frame with the result banner; later frames are ignored until :meth:`new_match`."""
+        self._control.put(("final", drones, hud))
+
+    def wait_closed(self, cancel: Optional[Any] = None) -> None:
+        """Blocks until the user closes the window, the process ends or ``cancel`` is set."""
+        while not self._closed.wait(0.2):
+            if not self._process.is_alive() or (cancel is not None and cancel.is_set()):
+                return
+
+    def is_alive(self) -> bool:
+        return self._process.is_alive()
 
     def close(self) -> None:
         if self._process.is_alive():
+            self._control.put(("stop",))
+            self._process.join(timeout=3.0)
+        if self._process.is_alive():
             self._process.terminate()
-        self._process.join(timeout=2.0)
+            self._process.join(timeout=2.0)

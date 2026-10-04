@@ -106,3 +106,34 @@ def test_layout_matches_specification() -> None:
     assert [slots[i].start_ned[0] for i in (1, 2, 3)] == [150.0] * 3
     assert np.diff([slots[i].start_ned[1] for i in (4, 5, 6)]).tolist() == [5.0, 5.0]
     assert slots[1].instance == 0 and slots[6].instance == 5
+
+
+CONFIG_5V5 = Path(__file__).resolve().parent.parent / "arena_config_5v5.toml"
+
+
+@pytest.mark.parametrize("config_path", [None, CONFIG_5V5], ids=["3v3", "5v5"])
+def test_every_example_team_plays_without_errors(config_path) -> None:
+    from pipeline.drones_battle.tournament import discover_teams
+
+    config = load_config(config_path).with_overrides(sandbox={"isolation": "inline"})
+    teams = discover_teams()
+    assert {"baseline", "hunters", "tricksters", "pincer", "wolfpack"} <= set(teams)
+    for team in teams:
+        for attacker, defender in ((team, "baseline"), ("baseline", team)):
+            result = run_match(
+                config, f"pipeline.drones_battle.teams.{attacker}.attacker",
+                f"pipeline.drones_battle.teams.{defender}.defender",
+                fast=True, visualize=False, seed=1, start_jitter_m=3.0, verbose=False,
+            )
+            for side in ("attackers", "defenders"):
+                assert result.stats[side]["exceptions"] == 0, (team, side)
+
+
+def test_5v5_layout_and_ports() -> None:
+    from pipeline.drones_battle.core.layout import connection_string, drone_slots
+
+    config = load_config(CONFIG_5V5)
+    slots = drone_slots(config)
+    assert len(slots) == 10
+    assert [s.team for s in slots].count("defenders") == 5
+    assert connection_string(config, slots[-1]) == "udp:127.0.0.1:14640"

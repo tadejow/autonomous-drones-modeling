@@ -20,10 +20,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from pipeline.drones_battle.backends import make_backend
 from pipeline.drones_battle.backends.base import PhysicsBackend
@@ -41,6 +43,29 @@ DEFAULT_ATTACKER = "pipeline.drones_battle.team_attacker"
 DEFAULT_DEFENDER = "pipeline.drones_battle.team_defender"
 
 
+class MatchCancelled(Exception):
+    """Raised when the ``cancel`` event is set during a match (GUI "Stop" button)."""
+
+
+def game_info(config: ArenaConfig, team: str, time_s: float) -> dict[str, Any]:
+    """The optional ``game`` argument passed to strategies that accept it."""
+    game, arena = config.game, config.arena
+    return {
+        "dt": game.dt,
+        "time_left": game.max_time_s - time_s,
+        "kill_radius": game.kill_radius_m,
+        "target_radius": game.target_radius_m,
+        "defender_exclusion_radius": game.defender_exclusion_radius_m,
+        "max_speed": config.safety.max_speed_for(team),
+        "enemy_max_speed": config.safety.max_speed_for("defenders" if team == "attackers" else "attackers"),
+        "bounds": {
+            "north": (arena.north_min_m, arena.north_max_m),
+            "east": (arena.east_min_m, arena.east_max_m),
+            "alt": (arena.alt_min_m, arena.alt_max_m),
+        },
+    }
+
+
 class Match:
     """Runs one battle on a prepared backend. The class owns no GUI and no network code."""
 
@@ -54,6 +79,10 @@ class Match:
         visualizer: Optional[Any] = None,
         realtime: Optional[bool] = None,
         verbose: bool = True,
+        title: str = "",
+        speedup: float = 1.0,
+        cancel: Optional[threading.Event] = None,
+        on_event: Optional[Callable[[str], None]] = None,
     ) -> None:
         self.config = config
         self.backend = backend
@@ -63,6 +92,11 @@ class Match:
         self.visualizer = visualizer
         self.realtime = backend.realtime if realtime is None else realtime
         self.verbose = verbose
+        self.title = title
+        # Only simulated time can run faster than the wall clock (SITL runs at its own pace).
+        self.speedup = speedup if getattr(backend, "simulated_time", False) else 1.0
+        self.cancel = cancel
+        self.on_event = on_event
         self.referee = Referee(config)
         self.limiter = SafetyLimiter(config)
         self.hits: list[tuple[float, float, float]] = []
@@ -76,23 +110,7 @@ class Match:
         }
 
     def _game_info(self, time_s: float, team: str) -> dict[str, Any]:
-        game, arena = self.config.game, self.config.arena
-        return {
-            "dt": game.dt,
-            "time_left": game.max_time_s - time_s,
-            "kill_radius": game.kill_radius_m,
-            "target_radius": game.target_radius_m,
-            "defender_exclusion_radius": game.defender_exclusion_radius_m,
-            "max_speed": self.config.safety.max_speed_for(team),
-            "enemy_max_speed": self.config.safety.max_speed_for(
-                "defenders" if team == "attackers" else "attackers"
-            ),
-            "bounds": {
-                "north": (arena.north_min_m, arena.north_max_m),
-                "east": (arena.east_min_m, arena.east_max_m),
-                "alt": (arena.alt_min_m, arena.alt_max_m),
-            },
-        }
+        return game_info(self.config, team, time_s)
 
     def _frame(self, time_s: float, states: dict[int, RawState], commands: dict[int, Any]) -> dict[str, Any]:
         drones = {
@@ -120,23 +138,28 @@ class Match:
             "events": self.event_lines[-5:],
             "hits": self.hits,
             "banner": banner,
+            "title": self.title,
         }
 
     def _log(self, message: str) -> None:
         if self.verbose:
             print(message)
+        if self.on_event is not None:
+            self.on_event(message)
 
     # ------------------------------------------------------------------ main loop
     def run(self) -> MatchResult:
         game = self.config.game
         target = game.target_ned
-        clock = FixedRateClock(game.tick_hz, realtime=self.realtime)
+        clock = FixedRateClock(game.tick_hz * self.speedup, realtime=self.realtime)
         self.backend.start_clock()
         previous = self.backend.read_states()
         result: Optional[MatchResult] = None
         last_frame: dict[str, Any] = {}
 
         while result is None:
+            if self.cancel is not None and self.cancel.is_set():
+                raise MatchCancelled()
             time_s = self.backend.now()
             states = self.backend.read_states()
 
@@ -196,8 +219,16 @@ class Match:
         banner = f"{result.winner.upper()} WIN ({result.reason.value}, t = {result.time:.1f} s)"
         self._log(banner)
         if self.visualizer is not None and last_frame:
-            self.visualizer.finish(last_frame["drones"], self._hud(result.time, banner))
+            self.visualizer.show_final(last_frame["drones"], self._hud(result.time, banner))
         return result
+
+
+def window_layout_for(config: ArenaConfig, backend_name: str) -> str:
+    """Resolves ``window_layout = "auto"``: next to the MAVProxy map for SITL, maximized otherwise."""
+    layout = config.visualization.window_layout
+    if layout == "auto":
+        return "right_half" if backend_name == "sitl" else "maximized"
+    return layout
 
 
 def run_match(
@@ -211,22 +242,53 @@ def run_match(
     seed: Optional[int] = None,
     start_jitter_m: float = 0.0,
     verbose: bool = True,
+    *,
+    visualizer: Optional[Any] = None,
+    final_hold_s: Optional[float] = None,
+    speedup: float = 1.0,
+    backend: Optional[PhysicsBackend] = None,
+    cancel: Optional[threading.Event] = None,
+    on_event: Optional[Callable[[str], None]] = None,
+    title: Optional[str] = None,
 ) -> MatchResult:
-    """Builds every component, runs the match and always cleans up (``finally``)."""
+    """Builds every component, runs the match and always cleans up (``finally``).
+
+    Extra keyword arguments used by the GUI and tournaments:
+
+    * ``visualizer``: an existing :class:`VisualizerProcess` reused for many
+      matches (``visualize`` is then ignored and the window stays open);
+    * ``final_hold_s``: how long the result stays on screen; ``None`` waits
+      until the user closes the window (only for a visualizer created here);
+    * ``speedup``: kinematic real-time playback faster than real time;
+    * ``backend``: an already connected backend reused between matches (SITL
+      tournaments); it is not shut down at the end, only ``end_match`` is called;
+    * ``cancel``: setting the event stops the match with :class:`MatchCancelled`;
+    * ``on_event``: receives every log line (hits, result).
+    """
     sandbox = config.sandbox
-    backend = make_backend(backend_name, config, seed=seed, realtime=not fast)
+    owns_backend = backend is None
+    if backend is None:
+        backend = make_backend(backend_name, config, seed=seed, realtime=not fast)
     attackers = defenders = None
-    visualizer = None
+    owns_visualizer = visualizer is None and visualize
     recorder: Recorder = JsonlRecorder(record_path) if record_path else NullRecorder()
+    title = title or f"{_short(attacker_ref)} (attack) vs {_short(defender_ref)} (defence)"
     try:
-        attackers = make_controller(
-            "attackers", attacker_ref, config.game.attacker_ids, sandbox.isolation, sandbox.max_late_s,
-            sandbox.max_restarts,
-        )
-        defenders = make_controller(
-            "defenders", defender_ref, config.game.defender_ids, sandbox.isolation, sandbox.max_late_s,
-            sandbox.max_restarts,
-        )
+        def controller(team: str, ref: str, ids: tuple[int, ...]) -> TeamController:
+            return make_controller(team, ref, ids, sandbox.isolation, sandbox.max_late_s, sandbox.max_restarts)
+
+        if sandbox.isolation == "process":
+            # Both strategy processes start at the same time (each needs ~1 s to import).
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                attacker_future = pool.submit(controller, "attackers", attacker_ref, config.game.attacker_ids)
+                defender_future = pool.submit(controller, "defenders", defender_ref, config.game.defender_ids)
+                defenders = defender_future.result() if defender_future.exception() is None else None
+                attackers = attacker_future.result()
+                if defenders is None:
+                    defender_future.result()  # re-raises the defenders' error
+        else:
+            attackers = controller("attackers", attacker_ref, config.game.attacker_ids)
+            defenders = controller("defenders", defender_ref, config.game.defender_ids)
         if verbose:
             print(f"Backend: {backend_name}. Connecting...")
         backend.connect()
@@ -238,35 +300,68 @@ def run_match(
             "backend": backend_name,
             "attacker": attacker_ref,
             "defender": defender_ref,
+            "title": title,
             "seed": seed,
             "config": config.as_dict(),
         })
-        if visualize:
+        if owns_visualizer:
             from pipeline.drones_battle.arena_visualizer import VisualizerProcess
 
-            layout = config.visualization.window_layout
-            if layout == "auto":
-                layout = "right_half" if backend_name == "sitl" else "maximized"
-            visualizer = VisualizerProcess(config, window_layout=layout)
-        if backend.realtime:
+            visualizer = VisualizerProcess(config, window_layout=window_layout_for(config, backend_name), title=title)
+            visualizer.wait_ready()
+        elif visualizer is not None:
+            visualizer.new_match(title)
+        if not getattr(backend, "simulated_time", False):  # SITL: give the pilots a moment
             for remaining in range(int(config.game.countdown_s), 0, -1):
+                if cancel is not None and cancel.is_set():
+                    raise MatchCancelled()
                 if verbose:
                     print(f"Battle starts in {remaining}...")
                 time.sleep(1.0)
         if verbose:
             print("FIGHT!")
-        match = Match(config, backend, attackers, defenders, recorder, visualizer, verbose=verbose)
-        return match.run()
+        match = Match(config, backend, attackers, defenders, recorder, visualizer, verbose=verbose, title=title,
+                      speedup=speedup, cancel=cancel, on_event=on_event)
+        result = match.run()
+        if visualizer is not None:
+            if final_hold_s is None and owns_visualizer:
+                if verbose:
+                    print("Close the plot window to exit.")
+                visualizer.wait_closed(cancel)
+            elif final_hold_s:
+                _sleep_unless_cancelled(final_hold_s, cancel)
+        return result
     finally:
         for controller in (attackers, defenders):
             if controller is not None:
                 controller.close()
         try:
-            backend.shutdown()
+            if owns_backend:
+                backend.shutdown()
+            else:
+                backend.end_match()
         finally:
             recorder.close()
-            if visualizer is not None:
+            if owns_visualizer and visualizer is not None:
                 visualizer.close()
+
+
+def _short(ref: str) -> str:
+    """Readable team name from a module path or a file path (``.../300538/attacker.py`` -> ``300538``)."""
+    if ref.endswith(".py") or "/" in ref or "\\" in ref:
+        path = Path(ref)
+        return path.parent.name if path.stem in ("attacker", "defender") else path.stem
+    parts = ref.split(".")
+    if len(parts) >= 2 and parts[-1] in ("attacker", "defender"):
+        return parts[-2]
+    return parts[-1]
+
+
+def _sleep_unless_cancelled(seconds: float, cancel: Optional[threading.Event]) -> None:
+    if cancel is None:
+        time.sleep(seconds)
+    else:
+        cancel.wait(seconds)
 
 
 def main(argv: Optional[list[str]] = None) -> None:

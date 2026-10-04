@@ -27,6 +27,8 @@ GRAVITY_MPS2 = 9.81
 
 
 class KinematicBackend:
+    simulated_time = True
+
     def __init__(self, config: ArenaConfig, seed: int | None = None, realtime: bool = False) -> None:
         self.config = config
         self.realtime = realtime
@@ -103,6 +105,9 @@ class KinematicBackend:
                 position[2] = 0.0
                 velocity[:] = 0.0
         self.time += dt
+
+    def end_match(self) -> None:
+        pass
 
     def shutdown(self) -> None:
         for drone_id in self.pos:

@@ -87,7 +87,7 @@ def main():
     ]
 
     import sys, os
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
     from pipeline.visualization.plotter import DronePlotter
     plotter = DronePlotter(title="Podstawy Ruchu: Trajektoria Kwadratu", trail_length=1500)
     plotter.set_view(elev=45, azim=-45)

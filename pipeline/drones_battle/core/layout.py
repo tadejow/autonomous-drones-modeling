@@ -4,7 +4,7 @@ Run as a script to print one line per drone for the shell launcher::
 
     python3 -m pipeline.drones_battle.core.layout [--config arena_config.toml]
     # mode udp|tcp
-    # instance sysid lat lon alt_amsl heading orchestrator_port map_port
+    # instance sysid lat lon alt_amsl heading orchestrator_port map_port team
 """
 
 from __future__ import annotations
@@ -65,7 +65,7 @@ def main() -> None:
             map_port = sitl.map_udp_base_port + sitl.port_step * slot.instance
         print(
             f"{slot.instance} {slot.drone_id} {lat:.7f} {lon:.7f} {alt:.1f} "
-            f"{slot.heading_deg:.0f} {orchestrator_port} {map_port}"
+            f"{slot.heading_deg:.0f} {orchestrator_port} {map_port} {slot.team}"
         )
 
 

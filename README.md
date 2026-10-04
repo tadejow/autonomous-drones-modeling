@@ -26,14 +26,14 @@ Projekt dzieli się na dwie główne części: **Materiały Szkoleniowe (POC)** 
 Zintegrowany pakiet zgodny z wzorcami inżynierii oprogramowania. Znajdują się tu gotowe klasy do sterowania (VehicleManager), wizualizacji (DronePlotter) oraz skrypty zaawansowanych misji. Szczegóły znajdziesz w `pipeline/README.md`.
 Do szybkiego uruchamiania symulacji przygotowano katalog `scripts/` (np. `launch_single.sh`).
 
-### 2. Katalogi Edukacyjne POC (`01` - `05`)
+### 2. Katalogi Edukacyjne POC (`labs/01` - `labs/05`)
 Początkowe skrypty edukacyjne wprowadzające pojęcia matematyczne i fizyczne w lotach autonomicznych. W każdym katalogu znajduje się osobny plik `README.md` z zaawansowaną analizą merytoryczną zastosowanej tam matematyki.
 
-*   `01_podstawy_ruchu/` – Inicjalizacja asynchronicznych pętli kontrolnych, start, lądowanie oraz podstawowa nawigacja po prostej trajektorii w układzie NED.
-*   `02_fizyka_i_matematyka/` – Przejście do ciągłego planowania lotu przy użyciu równań parametrycznych. Analiza wpływu surowej fizyki (wiatru, bezwładności) na zachowanie regulatorów PID i EKF.
-*   `03_misje_autonomiczne/` – Geometria obliczeniowa w zastosowaniach przemysłowych. Wykorzystanie algorytmów optymalizacyjnych (Problem Komiwojażera) i bezstanowych misji pokładowych.
-*   `04_wizualizacja_3D/` – Zaawansowane transformacje układów współrzędnych i "zamiatanie" (sweep-line) nieregularnych poligonów. Zawiera wbudowane na żywo wykresy `matplotlib` z naprowadzaniem predykcyjnym (ProNav).
-*   `05_uklady_autonomiczne/` – Robotyka roju (Swarm Robotics). Skrypty i bash-owe instalatory łączące się z klastrami od 3 do 8 dronów, implementujące hybrydowy model Cuckera-Smale'a dla zachowań emergentnych.
+*   `labs/01_podstawy_ruchu/` – Inicjalizacja asynchronicznych pętli kontrolnych, start, lądowanie oraz podstawowa nawigacja po prostej trajektorii w układzie NED.
+*   `labs/02_fizyka_i_matematyka/` – Przejście do ciągłego planowania lotu przy użyciu równań parametrycznych. Analiza wpływu surowej fizyki (wiatru, bezwładności) na zachowanie regulatorów PID i EKF.
+*   `labs/03_misje_autonomiczne/` – Geometria obliczeniowa w zastosowaniach przemysłowych. Wykorzystanie algorytmów optymalizacyjnych (Problem Komiwojażera) i bezstanowych misji pokładowych.
+*   `labs/04_wizualizacja_3D/` – Zaawansowane transformacje układów współrzędnych i "zamiatanie" (sweep-line) nieregularnych poligonów. Zawiera wbudowane na żywo wykresy `matplotlib` z naprowadzaniem predykcyjnym (ProNav).
+*   `labs/05_uklady_autonomiczne/` – Robotyka roju (Swarm Robotics). Skrypty i bash-owe instalatory łączące się z klastrami od 3 do 8 dronów, implementujące hybrydowy model Cuckera-Smale'a dla zachowań emergentnych.
 
 ---
 
@@ -60,8 +60,8 @@ source ~/.profile
 Sklonuj niniejsze repozytorium i zbuduj wyizolowane środowisko wirtualne dla zależności programistycznych:
 
 ```bash
-git clone https://github.com/tadejow/autonomous-drones-wrones.git
-cd autonomous-drones-wrones
+git clone https://github.com/tadejow/autonomous-drones-modeling.git
+cd autonomous-drones-modeling
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -84,7 +84,7 @@ Złotą zasadą symulacji BSP jest rozdzielenie silnika fizyki (serwera) od skry
 2. **Uruchom skrypt matematyczny (Terminal 2):**
    W terminalu z aktywowanym środowiskiem wirtualnym `(venv)` przejdź do wybranego modułu i go uruchom.
    ```bash
-   cd ~/autonomous-drones-wrones/01_podstawy_ruchu
+   cd ~/autonomous-drones-modeling/labs/01_podstawy_ruchu
    python 01_start.py
    ```
 

@@ -10,6 +10,26 @@ Zgodnie z resztą kursu kod jest po angielsku (PEP 8, type hints), a dokumentacj
 
 Wszystkie polecenia uruchamiamy z **katalogu głównego repozytorium**.
 
+### GUI: drużyny studentów, walki i turnieje
+
+```bash
+python -m pipeline.drones_battle.arena_gui
+```
+
+1. Zgłoszenia studentów (katalogi `<numer_indeksu>/` albo pliki `<numer_indeksu>.zip`) wrzucamy do [`student_teams/`](student_teams/README.md). Tam też jest dokładny opis, jak student ma przygotować swój katalog, oraz szablon `_szablon/`.
+2. GUI rozpakowuje ZIP-y i sprawdza każdą drużynę w osobnym procesie (czy są `attacker.py` i `defender.py`, czy się importują, czy zwracają poprawne komendy w 3 vs 3 i 5 vs 5, ile trwa wywołanie). Status: zielony OK, pomarańczowy z uwagami, czerwony BŁĄD (dwuklik = szczegóły z tracebackiem z kodu studenta).
+3. **Walka**: wybierz drużynę atakującą i broniącą, kliknij *Walka*. Okno 3D pokazuje mecz; po zamknięciu okna wynik jest w dzienniku.
+4. **Turniej**: zaznacz drużyny (kolumna ☐ albo *Zaznacz poprawne*) i kliknij *Turniej*. Każda para gra w obu rolach (`rundy na parę` razy). Mecze lecą jeden po drugim w tym samym oknie 3D, a po ostatnim otwiera się okno z **tabelą wyników**, macierzą „kto kogo pokonał” i listą meczów (dwuklik = powtórka).
+5. Ustawienia: format 3 vs 3 / 5 vs 5, fizyka (model kinematyczny albo SITL; przyciski *Uruchom/Zatrzymaj SITL* tylko na Linuksie), tempo (1×, 2×, 4× albo bez wizualizacji), pauza po meczu. *Przerwij* zatrzymuje mecz lub turniej (wyniki częściowe też są pokazywane).
+6. Wyniki i nagrania lądują w `matches/gui/turniej_<data>/`: `wyniki.md`, `tabela.csv`, `mecze.csv` oraz `.jsonl` każdego meczu.
+
+Bez GUI to samo da się zrobić z wiersza poleceń:
+
+```bash
+python -m pipeline.drones_battle.core.submissions             # sprawdzenie wszystkich katalogów studentów
+python -m pipeline.drones_battle.tournament --submissions --rounds 2
+```
+
 ### Bez symulatora (Windows, Linux, macOS)
 
 ```bash
@@ -83,6 +103,40 @@ python -m pipeline.drones_battle.arena_orchestrator --backend kinematic --fast -
 python -m pipeline.drones_battle.replay walka.jsonl --save walka.gif --topdown --step 2 --fps 5
 ```
 
+### Walki 5 vs 5
+
+Konfiguracja `arena_config_5v5.toml` (atakujący SysID 1–5, obrońcy 6–10) działa z tym samym kodem; wystarczy dodać `--config`:
+
+```bash
+python -m pipeline.drones_battle.arena_orchestrator --backend kinematic --config pipeline/drones_battle/arena_config_5v5.toml
+python -m pipeline.drones_battle.tournament --config pipeline/drones_battle/arena_config_5v5.toml --rounds 6
+# SITL: 10 symulatorów (porty 14550..14640, mapa 14650..14740)
+ARENA_CONFIG=pipeline/drones_battle/arena_config_5v5.toml ./pipeline/drones_battle/start_arena.sh
+python -m pipeline.drones_battle.arena_orchestrator --backend sitl --config pipeline/drones_battle/arena_config_5v5.toml
+```
+
+| Plik | Atak → obrona | Wynik | Co widać |
+|---|---|---|---|
+| [01](examples/5v5/01_pincer_vs_pincer.gif) | pincer → pincer | atakujący, 21,7 s | atak kleszczowy: zbiórka na okręgu 42 m i jednoczesne uderzenie z pięciu kierunków przeciążają obronę strefową |
+| [02](examples/5v5/02_wolfpack_vs_hunters.gif) | wolfpack → hunters | atakujący, 19,5 s | „tarany” wymieniają się z obrońcami 1:1, a biegacz z flanki wchodzi w lukę |
+| [03](examples/5v5/03_hunters_vs_pincer.gif) | hunters → pincer | obrońcy, 25,1 s | długa walka: obrona strefowa z rezerwą łapie atakujących omijających straż |
+| [04](examples/5v5/04_hunters_vs_wolfpack.gif) | hunters → wolfpack | atakujący, 18,6 s | odpychanie od obrońców przebija linię zaporową |
+| [05](examples/5v5/05_wolfpack_vs_pincer.gif) | wolfpack → pincer | obrońcy, 21,1 s | obrońcy z posterunków nie dają się staranować, biegacze giną przy bazie |
+
+![Atak kleszczowy 5 vs 5](examples/5v5/01_pincer_vs_pincer.gif)
+
+### Drużyny przykładowe (`teams/`)
+
+| Drużyna | Atak | Obrona |
+|---|---|---|
+| `baseline` | szablon: prosto do celu | szablon: pościg za najbliższym |
+| `hunters` | przyciąganie do celu + odpychanie kulombowskie od obrońców | optymalny przydział (permutacje, minimax czasu) + przechwycenie predykcyjne |
+| `tricksters` | dwóch flankujących jako przynęta, opóźniony biegacz | straż na linii baza–atakujący, uderzenie z bliska |
+| `pincer` | zbiórka na okręgu wokół celu i jednoczesne uderzenie z wielu kierunków | obrona strefowa: posterunki na półokręgu + rezerwa przy bazie, ranking zagrożeń po czasie do celu |
+| `wolfpack` | „tarany” celowo zderzają się z obrońcami (kamikaze działa w obie strony), biegacze czekają na flankach | linia zaporowa, która wysyła obrońcę tylko do realnych zagrożeń (czas do celu < 14 s lub taran) |
+
+Turniej 5 vs 5 (6 rund na parę, 150 meczów): hunters 150 pkt, pincer 111, wolfpack 96, tricksters 75, baseline 18; atakujący wygrywają 39% meczów.
+
 ---
 
 ## Zasady gry
@@ -139,6 +193,7 @@ Do debugowania z breakpointami (PyCharm): `--inline`, wtedy funkcja działa w ty
 
 ```text
 pipeline/drones_battle/
+├── arena_gui.py            # GUI (tkinter): drużyny studentów, walka, turniej, tabela wyników
 ├── arena_orchestrator.py   # CLI + klasa Match: pętla 10 Hz
 ├── arena_visualizer.py     # ArenaVisualizer (2 widoki 3D + opcjonalna mapa 2D), osobny proces
 ├── team_attacker.py        # szablon studenta
@@ -155,11 +210,13 @@ pipeline/drones_battle/
 │   ├── sandbox.py          # strategie w osobnych procesach z budżetem czasu
 │   ├── recorder.py         # zapis JSONL
 │   ├── clock.py            # pętla o stałej częstotliwości, jitter
+│   ├── submissions.py      # katalogi studentów: wykrywanie, ZIP-y, walidacja w osobnym procesie
 │   └── types.py, compat.py
 ├── backends/
 │   ├── kinematic.py        # model punktu materialnego, bez SITL
 │   └── sitl.py             # DroneKit + ArduPilot SITL
-├── teams/                  # baseline, hunters, tricksters
+├── teams/                  # baseline, hunters, tricksters, pincer, wolfpack
+├── student_teams/          # zgłoszenia studentów (poza gitem) + README z formatem + _szablon/
 └── tests/                  # pytest, bez SITL
 ```
 
@@ -209,7 +266,7 @@ Turniej z 10 rundami na parę (losowe przesunięcie startu do 3 m), przykładowe
 
 | Ustawienie | Wygrane atakujących |
 |---|---:|
-| domyślne: obrońcy kamikaze, 10 m/s obie strony | 41% |
+| domyślne: obrońcy kamikaze, 10 m/s obie strony | 41% (3 pierwsze drużyny), 33% (wszystkie 5) |
 | kamikaze, `defender_max_speed_mps = 9` | 44% |
 | obrońcy nieśmiertelni (`mutual_kill = false`), 10 m/s | 31% |
 | obrońcy nieśmiertelni, `defender_max_speed_mps = 9` | 42% |

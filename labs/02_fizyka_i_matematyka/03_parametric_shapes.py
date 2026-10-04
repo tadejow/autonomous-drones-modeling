@@ -121,7 +121,7 @@ def main():
     import sys
     import os
     # Dodajemy folder główny do ścieżki, by móc zaimportować DronePlottera
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
     from pipeline.visualization.plotter import DronePlotter
 
     print(f"\nExecuting trajectory: {shape_name}")

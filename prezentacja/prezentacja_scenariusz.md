@@ -2,7 +2,7 @@
 
 **Czas trwania:** ok. 45 minut wykładu + 5 minut na sesję Q&A
 **Grupa docelowa:** Młodzież licealna (Dolnośląski Kongres Młodego Odkrywcy)
-**Materiały:** Slajdy (LaTeX/Beamer), Filmy/Animacje symulacji z katalogów 01-05.
+**Materiały:** Slajdy (LaTeX/Beamer), Filmy/Animacje symulacji z katalogów labs/01-05.
 
 ---
 
@@ -29,7 +29,7 @@ Zacznijmy od podstaw. Jak dron odnajduje się w przestrzeni? Większość z Was 
 **Slajd:** Start drona – pierwszy kod
 **Mowa:**
 Gdy programujemy lot drona, nie wysyłamy mu komendy "leć szybciej do przodu". Zamiast tego mówimy: "obecnie jesteś w punkcie (0, 0, 0), twoim zadaniem jest znalezienie się w punkcie (10, 5, 20)". Matematyka robi resztę – wylicza trajektorię, czyli linię, po której maszyna ma się przemieścić. Zobaczmy, jak wygląda najprostszy, automatyczny start.
-**[WIDEO: `01_podstawy_ruchu/01_start.py` i `02_trajectory.py`]** 
+**[WIDEO: `labs/01_podstawy_ruchu/01_start.py` i `02_trajectory.py`]** 
 (Omawiamy krótko start maszyny i lot od punktu do punktu po prostej trajektorii).
 
 ---
@@ -43,7 +43,7 @@ Na papierze lot po idealnej prostej wydaje się prosty. Ale nasz dron lata na ze
 **Slajd:** Trajektorie - krzywe parametryczne
 **Mowa:**
 A co, gdy dron ma sfilmować obiekt z każdej strony? Musi krążyć. Do tego nie wystarczy jeden punkt. Wykorzystujemy coś, co w matematyce nazywamy krzywymi parametrycznymi. Możemy zaprogramować tor lotu przypominający okrąg, elipsę czy spiralę, posługując się chociażby funkcjami trygonometrycznymi (sinus i cosinus).
-**[WIDEO: `02_fizyka_i_matematyka/03_parametric_shapes.py` i `04_physics_wind.py`]**
+**[WIDEO: `labs/02_fizyka_i_matematyka/03_parametric_shapes.py` i `04_physics_wind.py`]**
 (Pokazujemy lot po pięknych, matematycznych krzywych i jak system stara się go utrzymać w przypadku uderzeń wiatru).
 
 ---
@@ -58,7 +58,7 @@ To zagadnienie znane w informatyce i matematyce jako "Problem komiwojażera". Al
 **Slajd:** Zaawansowane misje ratunkowe 3D
 **Mowa:**
 Poszukiwania często odbywają się w zróżnicowanym terenie górskim, albo wymagają śledzenia poruszającego się obiektu. Dron musi nieustannie przeliczać swoje położenie względem uciekającego celu.
-**[WIDEO: `03_misje_autonomiczne/06_tsp_mission.py` oraz `04_wizualizacja_3D/07_a_polygon_search.py`, `07_b_pursuit.py`, `07_c_cylinder_scan.py`]**
+**[WIDEO: `labs/03_misje_autonomiczne/06_tsp_mission.py` oraz `labs/04_wizualizacja_3D/07_a_polygon_search.py`, `07_b_pursuit.py`, `07_c_cylinder_scan.py`]**
 (Prezentujemy na nagraniach skanowanie obszaru, oraz widowiskowy pościg i przeszukiwanie objętości cylindra – np. nad płonącym budynkiem).
 
 ---
@@ -77,7 +77,7 @@ Każdy dron musi spełnić 3 zasady matematyczne:
 **Slajd:** Rój w akcji
 **Mowa:**
 Rozwiązując w każdym ułamku sekundy zaledwie kilka równań, te 30 maszyn zaczyna "żyć" jako jeden organizm, wspólnie omijając przeszkody i realizując cel misji bez centralnego dowodzenia!
-**[WIDEO: `05_uklady_autonomiczne/05_a_cucker_smale_model.py` i `05_b_flock_split.py`]**
+**[WIDEO: `labs/05_uklady_autonomiczne/05_a_cucker_smale_model.py` i `05_b_flock_split.py`]**
 (Puszczamy wideo ze startu całego roju oraz wideo pokazujące piękne rozdzielenie się stada na dwie grupy przy omijaniu przeszkody).
 
 ---

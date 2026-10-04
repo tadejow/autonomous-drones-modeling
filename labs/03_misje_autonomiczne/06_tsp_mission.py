@@ -123,7 +123,7 @@ def main():
     cmds.upload()
 
     import sys, os
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
     from pipeline.visualization.plotter import DronePlotter
     plotter = DronePlotter(title="Misje Autonomiczne: Logistyka (TSP)", trail_length=2000)
     plotter.set_view(elev=90, azim=-90)

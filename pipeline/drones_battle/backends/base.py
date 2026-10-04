@@ -10,7 +10,9 @@ from pipeline.drones_battle.core.types import RawState, Vec3
 
 class PhysicsBackend(Protocol):
     realtime: bool
-    """True when time flows on its own (SITL); False when ``step`` advances it."""
+    """True when the match loop must be paced by the wall clock."""
+    simulated_time: bool
+    """True when ``step`` advances time (kinematic model; can run faster than real time)."""
 
     def connect(self) -> None:
         """Opens connections and prepares every drone."""
@@ -35,6 +37,9 @@ class PhysicsBackend(Protocol):
 
     def start_clock(self) -> None:
         """Marks t = 0 of the battle."""
+
+    def end_match(self) -> None:
+        """Called instead of ``shutdown`` when the backend is reused for the next match."""
 
     def shutdown(self) -> None:
         """Lands or returns all drones and closes connections."""
