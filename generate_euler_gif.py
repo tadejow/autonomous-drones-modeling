@@ -25,7 +25,7 @@ def get_rot_z(psi):
 fig = plt.figure(figsize=(6, 5), facecolor='white')
 ax = fig.add_subplot(111, projection='3d')
 
-out_dir = "prezentacja/images/euler_frames"
+out_dir = "slides/images/euler_frames"
 os.makedirs(out_dir, exist_ok=True)
 
 def update(frame):
