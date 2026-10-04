@@ -62,6 +62,8 @@ class GameEvent:
         }
 
     def describe(self) -> str:
+        if self.kind is EventKind.HIT and self.detail == "mutual":
+            return f"t={self.time:5.1f}s  kamikaze drone {self.victim} destroyed with drone {self.actor}"
         if self.kind is EventKind.HIT:
             return f"t={self.time:5.1f}s  drone {self.actor} shot down drone {self.victim}"
         if self.kind is EventKind.TARGET_REACHED:

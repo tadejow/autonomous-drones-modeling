@@ -3,7 +3,8 @@
 Rules in short (details in README.md):
 * you control drones 1, 2, 3; the goal is to bring any of them within 5 m of
   ``target_pos`` (10 m above the defenders' base),
-* an attacker that comes within 2 m of an active defender is shot down,
+* an attacker that comes within 2 m of an active defender is destroyed; the
+  defenders are kamikaze drones, so that defender is destroyed as well,
 * the match lasts 120 s; commands are capped at 10 m/s (3 m/s vertically).
 
 Coordinates: NED in metres relative to the defenders' base (N = north,

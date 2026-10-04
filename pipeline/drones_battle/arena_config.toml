@@ -29,11 +29,11 @@ target_radius_m = 5.0
 target_alt_m = 10.0              # target point = 10 m above the defenders' base
 defender_exclusion_radius_m = 8.0  # anti-camping rule; 0 disables it (pure specification)
 kill_mode = "land"               # "land" (specification) or "freefall" (disarm in the air)
-mutual_kill = false              # true: the defender dies together with the attacker
+mutual_kill = true               # kamikaze defenders: the defender dies together with the attacker
 
 [safety]
 attacker_max_speed_mps = 10.0
-defender_max_speed_mps = 10.0    # balance knob: 9.0 gives ~42% attacker wins with the example teams
+defender_max_speed_mps = 10.0    # balance knob (with kamikaze defenders: 10 -> ~41%, 9 -> ~44% attacker wins)
 max_vertical_speed_mps = 3.0
 fence_margin_m = 5.0
 fence_gain = 1.0

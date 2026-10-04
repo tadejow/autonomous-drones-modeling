@@ -39,8 +39,8 @@ def _far_layout(**overrides: tuple[float, float, float]) -> dict[int, tuple[floa
     return layout
 
 
-def test_hit_kills_attacker_only() -> None:
-    referee = Referee(ArenaConfig())
+def test_hit_kills_attacker_only_without_kamikaze() -> None:
+    referee = Referee(ArenaConfig().with_overrides(game={"mutual_kill": False}))
     before = _states(_far_layout(d1=(80.0, 0.0, -15.0), d5=(79.0, 0.0, -15.0)))
     after = _states(_far_layout(d1=(79.0, 0.0, -15.0), d5=(80.0, 0.0, -15.0)))
     outcome = referee.evaluate(before, after, 10.0)
@@ -49,11 +49,20 @@ def test_hit_kills_attacker_only() -> None:
     assert outcome.result is None
 
 
-def test_mutual_kill_option() -> None:
-    referee = Referee(ArenaConfig().with_overrides(game={"mutual_kill": True}))
+def test_kamikaze_defender_dies_with_its_victim() -> None:
+    referee = Referee(ArenaConfig())  # mutual_kill is the default
     before = _states(_far_layout(d1=(80.0, 0.0, -15.0), d5=(80.5, 0.0, -15.0)))
     outcome = referee.evaluate(before, before, 1.0)
     assert {e.victim for e in outcome.hits} == {1, 5}
+    assert referee.alive[1] is False and referee.alive[5] is False
+
+
+def test_kamikaze_takes_down_only_one_attacker() -> None:
+    referee = Referee(ArenaConfig())
+    layout = _states(_far_layout(d1=(80.0, -0.5, -15.0), d2=(80.0, 0.5, -15.0), d5=(80.0, 0.0, -15.0)))
+    outcome = referee.evaluate(layout, layout, 1.0)
+    assert sorted(e.victim for e in outcome.hits) == [1, 5]
+    assert referee.alive[2] is True
 
 
 def test_defender_inside_exclusion_sphere_cannot_shoot() -> None:
@@ -68,7 +77,7 @@ def test_simultaneous_hit_and_arrival_goes_to_defenders() -> None:
     referee = Referee(ArenaConfig().with_overrides(game={"defender_exclusion_radius_m": 0.0}))
     layout = _states(_far_layout(d1=(0.0, 0.0, -10.0), d5=(1.0, 0.0, -10.0)))
     outcome = referee.evaluate(layout, layout, 5.0)
-    assert [e.victim for e in outcome.hits] == [1]
+    assert 1 in {e.victim for e in outcome.hits}
     assert outcome.result is None  # attackers 2 and 3 still fight
     assert not any(e.kind is EventKind.TARGET_REACHED for e in outcome.events)
 

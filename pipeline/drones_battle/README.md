@@ -54,7 +54,7 @@ python -m pipeline.drones_battle.replay <plik>.jsonl --save walka.gif --step 5
 |---|---|
 | Drużyny | atakujący SysID 1, 2, 3 (północ), obrońcy SysID 4, 5, 6 (baza, południe), 150 m odstępu |
 | Cel atakujących | punkt 10 m nad bazą obrońców; wygrana, gdy żywy atakujący zbliży się na < 5 m |
-| Zestrzelenie | atakujący w odległości < 2 m od aktywnego obrońcy ginie (tryb `LAND` lub swobodny spadek) |
+| Zestrzelenie | obrońcy to **drony kamikaze**: gdy obrońca zbliży się do atakującego na < 2 m, giną oba (tryb `LAND` lub swobodny spadek); jeden obrońca może zniszczyć tylko jednego atakującego |
 | Wygrana obrońców | wszyscy atakujący zestrzeleni albo minęło 120 s |
 | Reguła anty-campingowa | obrońca w kuli 8 m wokół celu nie strzela i jest z niej wypychany |
 | Prędkość | maks. 10 m/s (moduł wektora 3D), w pionie 3 m/s |
@@ -62,7 +62,7 @@ python -m pipeline.drones_battle.replay <plik>.jsonl --save walka.gif --step 5
 
 **Kolejność rozstrzygania w jednym ticku:** najpierw zestrzelenia (wszystkie jednocześnie), potem dotarcie do celu tylko przez atakujących, którzy przeżyli, potem „wszyscy atakujący zestrzeleni”, na końcu limit czasu. Zestrzelenie i dotarcie w tym samym ticku liczy się więc na korzyść obrońców.
 
-Wszystkie liczby są w `arena_config.toml`. Ustawienie `defender_exclusion_radius_m = 0` daje zasady dokładnie jak w pierwotnej specyfikacji.
+Wszystkie liczby są w `arena_config.toml`. Ustawienia `mutual_kill = false` i `defender_exclusion_radius_m = 0` dają zasady dokładnie jak w pierwotnej specyfikacji (obrońcy nieśmiertelni).
 
 ---
 
@@ -172,12 +172,12 @@ Turniej z 10 rundami na parę (losowe przesunięcie startu do 3 m), przykładowe
 
 | Ustawienie | Wygrane atakujących |
 |---|---:|
-| domyślne (10 m/s obie strony, jak w specyfikacji) | 31% |
-| `defender_max_speed_mps = 9` | 42% |
-| `defender_max_speed_mps = 8` | 51% |
-| `kill_radius_m = 1.5` | 44% |
+| domyślne: obrońcy kamikaze, 10 m/s obie strony | 41% |
+| kamikaze, `defender_max_speed_mps = 9` | 44% |
+| obrońcy nieśmiertelni (`mutual_kill = false`), 10 m/s | 31% |
+| obrońcy nieśmiertelni, `defender_max_speed_mps = 9` | 42% |
 
-Przy równych prędkościach obrońca stojący między atakującym a celem zawsze zdąży przechwycić (koło Apoloniusza degeneruje się do symetralnej). Jeśli studenci będą sfrustrowani po stronie ataku, najprostszą zmianą jest `defender_max_speed_mps = 9`:
+Przy równych prędkościach obrońca stojący między atakującym a celem zawsze zdąży przechwycić (koło Apoloniusza degeneruje się do symetralnej). Reguła kamikaze równoważy to liczebnie: każdy obrońca może zatrzymać tylko jednego atakującego, więc gdy jeden obrońca chybi lub zostanie zwabiony, atak ma przewagę. Dalsze strojenie, np.:
 
 ```bash
 python -m pipeline.drones_battle.tournament --rounds 10 --set safety.defender_max_speed_mps=9

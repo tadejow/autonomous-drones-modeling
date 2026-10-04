@@ -1,8 +1,9 @@
 """Student template: DEFENDERS strategy.
 
 Rules in short (details in README.md):
-* you control drones 4, 5, 6; an attacker within 2 m of one of your drones is
-  shot down; you win when all attackers are down or after 120 s,
+* you control drones 4, 5, 6; they are KAMIKAZE drones: when one comes within
+  2 m of an attacker, both are destroyed (one defender = at most one attacker),
+* you win when all attackers are down or after 120 s,
 * ``target_pos`` is your own base; a defender inside the 8 m sphere around it
   cannot shoot (anti-camping rule) and is pushed out by the arena,
 * commands are capped at 10 m/s (3 m/s vertically).

@@ -57,7 +57,7 @@ class GameSection:
     target_alt_m: float = 10.0
     defender_exclusion_radius_m: float = 8.0
     kill_mode: KillMode = "land"
-    mutual_kill: bool = False
+    mutual_kill: bool = True
 
     @property
     def dt(self) -> float:

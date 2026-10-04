@@ -4,7 +4,8 @@ Everything here is pure computation on positions, so it is unit tested without
 SITL. Order of resolution inside one tick (fixed, documented in the README):
 
 1. hits between alive attackers and alive defenders on the segment [t - dt, t],
-   all applied simultaneously,
+   all applied simultaneously; with ``mutual_kill`` (kamikaze defenders, the
+   default) the defender is destroyed too and can take down only one attacker,
 2. target check only for attackers that survived step 1 (a simultaneous hit and
    arrival therefore counts for the defenders),
 3. "all attackers down",
@@ -91,6 +92,8 @@ class Referee:
         for attacker in attackers:
             best: Optional[tuple[float, float, int]] = None
             for defender in defenders:
+                if game.mutual_kill and defender in killed:
+                    continue  # a kamikaze defender takes down only one attacker
                 d_min, s_star = closest_approach(
                     previous[attacker].pos, current[attacker].pos,
                     previous[defender].pos, current[defender].pos,
