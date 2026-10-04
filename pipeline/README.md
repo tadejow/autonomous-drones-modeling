@@ -41,5 +41,11 @@ Systemy wieloagentowe.
 - **`cucker_smale.py`**:
   - Implementacja flokowania. Agenci (Drony) aktualizują swoje prędkości zależnie od położenia sąsiadów, realizując funkcje separacji, aliniacji i kohezji.
 
+### `pipeline.drones_battle`
+Turniej „Walki Dronów 3 vs 3” (atakujący kontra obrońcy) na 6 instancjach SITL lub na szybkim modelu kinematycznym: orkiestrator, sędzia z ciągłą detekcją kolizji, Safety Limiter, piaskownica dla kodu studentów, wizualizacja 3D, powtórki i turniej każdy z każdym. Szczegóły w `pipeline/drones_battle/README.md`.
+
+### `pipeline.math.geodesy`
+Czyste (bez DroneKit) przeliczenia GPS ↔ NED ↔ ENU używane przez `physics.py` i `drones_battle`.
+
 ## Jak zacząć?
 Zajrzyj do katalogu `scripts/` (w głównym drzewie projektu), gdzie umieszczone zostały skrypty powłoki uruchamiające odpowiednie symulacje, np. `launch_single.sh` lub `launch_swarm_split.sh`. Następnie uruchamiaj moduły poprzez standardowe wykonanie np. `python -m pipeline.missions.physics_demo`.

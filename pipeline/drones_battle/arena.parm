@@ -1,0 +1,15 @@
+# ArduCopter parameters loaded by start_arena.sh (--add-param-file) for all 6 drones.
+# Verify the names on your ArduPilot version: "param show WPNAV*" in MAVProxy.
+BATT_FS_LOW_ACT  0
+BATT_FS_CRT_ACT  0
+FS_GCS_ENABLE    0
+WPNAV_SPEED      1500
+WPNAV_SPEED_UP   500
+WPNAV_SPEED_DN   300
+WPNAV_ACCEL      500
+LOIT_SPEED       1500
+SR0_POSITION     10
+SR1_POSITION     10
+SR2_POSITION     10
+SR0_EXTRA1       10
+GUID_TIMEOUT     3

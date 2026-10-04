@@ -1,0 +1,45 @@
+Jesteś Senior Robotics & Python Software Engineerem. Twoim zadaniem jest stworzenie kompletnego środowiska turniejowego (Arena) dla studentów uczelni wyższej, bazującego na symulacjach ArduPilot SITL, bibliotece DroneKit-Python oraz wizualizacji Matplotlib. 
+
+Kontekst: Studenci napisali skrypty implementujące strategie do "Walki Dronów 3 vs 3" (3 Atakujących, 3 Obrońców). System musi wywołać ich funkcje, zasymulować fizykę za pomocą ArduPilota, nałożyć system zniszczeń (kolizji) i zwizualizować to w 3 oknach. Wymagany standard kodu to PEP8, pełne Type Hinting, język angielski w kodzie.
+
+Stwórz nowy katalog `06_turniej_areny` i zaimplementuj w nim poniższą strukturę plików, ściśle trzymając się specyfikacji:
+
+### 1. Skrypt `start_arena.sh` (Infrastruktura sieciowa i SITL)
+Napisz skrypt Bash, który:
+- Zabija stare procesy (arducopter, mavproxy.py, xterm).
+- Otwiera 6 instancji `sim_vehicle.py --no-rebuild` w `xterm -hold` (użyj ścieżki `cd ~/ardupilot/ArduCopter`).
+- Drony Atakujące (SysID 1, 2, 3 / Porty UDP: 14550, 14560, 14570). Lokalizacja startowa: Północny kraniec wirtualnego lotniska (np. lat: -35.3620, lon: 149.1650). Drony rozstawione w rzędzie ze spacingiem 2 metry.
+- Drony Obrońców (SysID 4, 5, 6 / Porty UDP: 14580, 14590, 14600). Lokalizacja startowa: Południowy kraniec lotniska (np. lat: -35.3635, lon: 149.1650). Z dystansem ok. 150m od Atakujących.
+- NAJWAŻNIEJSZE: Skrypt nie otwiera `--map` przy instancjach `sim_vehicle`. Zamiast tego, na samym końcu skryptu, otwiera jedną zbiorczą instancję MAVProxy, podpinając się pod porty TCP wszystkich 6 symulatorów (`--master tcp:127.0.0.1:5760 --master tcp:127.0.0.1:5770` itd.) z flagą `--map`. To zrealizuje wymóg "Wizualizacja Okno 1: Mapa 2D wszystkich dronów".
+
+### 2. Szablony dla studentów: `team_attacker.py` oraz `team_defender.py`
+Stwórz dwa identyczne pliki szablonów. Każdy ma zawierać tylko jedną, czystą funkcję (bez połączeń z DroneKit).
+Sygnatura: `def compute_commands(my_team: dict, enemy_team: dict, target_pos: tuple, current_time: float) -> dict:`
+- `my_team` i `enemy_team` to słowniki w formacie: `{drone_id: {"pos": (N, E, D), "vel": (VN, VE, VD), "alive": bool}}`. Zmienne to floaty w metrach (układ NED).
+- `target_pos` to krotka `(N, E, D)`. Dla atakujących to współrzędne bazy obrońców, dla obrońców to ich własna baza (której bronią).
+- Funkcja zwraca słownik: `{drone_id: (cmd_vx, cmd_vy, cmd_vz)}`.
+Wewnątrz funkcji napisz prostą heurystykę (Atakujący lecą prosto do celu, Obrońcy lecą w stronę Atakujących), żeby system dało się przetestować.
+
+### 3. Wizualizator 3D: `arena_visualizer.py`
+Stwórz klasę `ArenaVisualizer` używając `matplotlib` (wymuś silnik `TkAgg`).
+- Otwiera duże okno figury podzielone na 2 Subploty 3D (Zrealizuje to wymóg "Wizualizacja Okno 2 i 3").
+- Subplot 1 (Perspektywa Obrońców): Ustaw `view_init` tak, by kamera znajdowała się w punkcie startu obrońców i patrzyła na północ (w stronę atakujących).
+- Subplot 2 (Perspektywa Atakujących): Ustaw `view_init` tak, by kamera znajdowała się w bazie atakujących i patrzyła na południe.
+- Posiada metodę `update_frame(drones_state: dict)`, która czyści i rysuje drony. Atakujący są Czerwoni, Obrońcy są Niebiescy. Zestrzelone drony (is_alive=False) rysuj na Szaro. Rysuj też przerywane trajektorie lotu (historię). Rysuj żółtą gwiazdkę w miejscu Bazy/Celu. Pamiętaj o obsłudze `plt.pause(0.05)`.
+
+### 4. Silnik Główny: `arena_orchestrator.py`
+To jest serce projektu. Skrypt musi zaimportować logikę studentów (`import team_attacker, team_defender`) i klasę `ArenaVisualizer`.
+Proces działania:
+1. Połączenie z 6 portami UDP MAVLink w pętli. Wyłączenie w nich `BATT_FS` i ustawienie `WP_SPEED = 1500` (15 m/s).
+2. Faza INIT: Uzbrojenie i asynchroniczny start wszystkich 6 dronów na wysokość 15m.
+3. Faza BATTLE (Pętla while True):
+   - Pobiera pozycje (przeliczone na metry NED za pomocą promienia Ziemi względem Bazy Obrońców).
+   - Aktualizuje stany (czy żyje). 
+   - **Silnik Kolizji:** Jeżeli `alive` Atakujący zbliży się do `alive` Obrońcy na dystans < 2.0 metra, Atakujący dostaje status `alive=False`, skrypt wysyła mu jednorazowo `vehicle.mode = VehicleMode("LAND")` (spadochron).
+   - **Warunki Zwycięstwa:** Jeżeli jakikolwiek żywy Atakujący ma dystans do Celu < 5.0m -> Wygrywają Atakujący (Break). Jeżeli wszyscy Atakujący nie żyją lub czas > 120s -> Wygrywają Obrońcy (Break).
+   - Wywołuje kody studentów w bloku `try...except`, by błąd studenta nie zrzucił Orkiestratora.
+   - Posiada **Safety Limiter**: obcina wektory zwrócone przez studentów do max modułu `10.0 m/s`.
+   - Przez DroneKit wysyła wektory do żywych dronów przy pomocy wiadomości `SET_POSITION_TARGET_LOCAL_NED`.
+   - Wywołuje `visualizer.update_frame()`.
+
+Pamiętaj o czystej architekturze, precyzyjnej matematyce zamiany GPS na metry (ze współczynnikiem cosinus dla długości geograficznej) i asynchronicznych opóźnieniach. Wygeneruj kompletny kod wszystkich 5 plików.
