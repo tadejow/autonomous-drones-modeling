@@ -5,9 +5,11 @@ from __future__ import annotations
 import time
 from typing import Callable
 
+SPIN_S = 0.003
+
 
 class FixedRateClock:
-    """Sleeps until the next scheduled tick.
+    """Sleeps until the next scheduled tick (``perf_counter``: ``monotonic`` ticks in 15 ms steps on Windows).
 
     The next deadline is computed from the previous *scheduled* time, not from
     the moment the loop woke up, so delays do not accumulate into drift. When a
@@ -18,7 +20,7 @@ class FixedRateClock:
         self,
         hz: float,
         realtime: bool = True,
-        time_fn: Callable[[], float] = time.monotonic,
+        time_fn: Callable[[], float] = time.perf_counter,
         sleep_fn: Callable[[float], None] = time.sleep,
     ) -> None:
         self.period = 1.0 / hz
@@ -34,7 +36,11 @@ class FixedRateClock:
         now = self._time()
         remaining = self._next - now
         if remaining > 0:
-            self._sleep(remaining)
+            # OS sleep is coarse (about 15 ms on Windows): sleep most of the way, spin the last bit.
+            if remaining > SPIN_S:
+                self._sleep(remaining - SPIN_S)
+            while self._time() < self._next:
+                pass
             self.lateness.append(max(self._time() - self._next, 0.0))
             self._next += self.period
         else:

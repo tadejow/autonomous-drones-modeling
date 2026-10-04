@@ -1,3 +1,7 @@
 matches/
 logs/
 .arena_pids
+# Student submissions are personal data: keep only the instructions and the template in git.
+student_teams/*
+!student_teams/README.md
+!student_teams/_szablon/

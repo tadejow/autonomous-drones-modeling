@@ -45,17 +45,45 @@ class StrategyCall:
     game: dict[str, Any] = field(default_factory=dict)
 
 
+def _load_file(path: Path) -> ModuleType:
+    """Executes a strategy file as a fresh module.
+
+    The file's folder is on ``sys.path`` while the file runs, so a student team
+    may split its code into helper modules (``import helpers`` at the top of
+    ``attacker.py``). Helper modules imported from that folder are removed from
+    ``sys.modules`` afterwards: two teams can both have a ``helpers.py`` without
+    one silently getting the other's code.
+    """
+    folder = path.parent
+    name = f"_strategy_{path.stem}_{abs(hash(str(path)))}"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load strategy file {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module  # dataclasses and pickling look the module up by name
+    before = set(sys.modules)
+    sys.path.insert(0, str(folder))
+    try:
+        spec.loader.exec_module(module)
+    except BaseException:
+        sys.modules.pop(name, None)
+        raise
+    finally:
+        try:
+            sys.path.remove(str(folder))
+        except ValueError:
+            pass
+        for loaded in set(sys.modules) - before:
+            file = getattr(sys.modules.get(loaded), "__file__", None)
+            if file and Path(file).resolve().is_relative_to(folder):
+                del sys.modules[loaded]
+    return module
+
+
 def load_module(ref: str) -> ModuleType:
     """Imports ``ref`` given either as a dotted module path or a path to a ``.py`` file."""
     if ref.endswith(".py") or Path(ref).exists():
-        path = Path(ref).resolve()
-        name = f"_strategy_{path.stem}_{abs(hash(str(path)))}"
-        spec = importlib.util.spec_from_file_location(name, path)
-        if spec is None or spec.loader is None:
-            raise ImportError(f"Cannot load strategy file {path}")
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module
+        return _load_file(Path(ref).resolve())
     if ref in sys.modules:
         # Fresh module state for every match (strategies may keep state in globals).
         return importlib.reload(sys.modules[ref])
@@ -110,11 +138,12 @@ class TeamController(Protocol):
 class InlineController:
     """In-process execution; a crash costs one tick of hovering."""
 
-    def __init__(self, team: str, ref: str, my_ids: tuple[int, ...]) -> None:
+    def __init__(self, team: str, ref: str, my_ids: tuple[int, ...], load: bool = True) -> None:
         self.team = team
         self.ref = ref
         self.my_ids = set(my_ids)
-        self.function, self.accepts_game = load_strategy(ref)
+        if load:
+            self.function, self.accepts_game = load_strategy(ref)
         self.errors: list[str] = []
         self.forfeited = False
         self._pending: Optional[StrategyCall] = None
@@ -195,8 +224,8 @@ class ProcessController(InlineController):
     def __init__(
         self, team: str, ref: str, my_ids: tuple[int, ...], max_late_s: float = 3.0, max_restarts: int = 3
     ) -> None:
-        # Load once in the parent too: a broken import is reported immediately and clearly.
-        super().__init__(team, ref, my_ids)
+        # Student code is imported only in the child; its import errors come back with a traceback.
+        super().__init__(team, ref, my_ids, load=False)
         self.max_late_s = max_late_s
         self.max_restarts = max_restarts
         self._context = mp.get_context("spawn")

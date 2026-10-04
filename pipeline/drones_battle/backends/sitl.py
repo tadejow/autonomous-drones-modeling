@@ -17,7 +17,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import numpy as np
 
@@ -25,14 +25,15 @@ from pipeline.drones_battle.core import compat  # noqa: F401  (must precede dron
 from pipeline.drones_battle.core.config import ArenaConfig, KillMode
 from pipeline.drones_battle.core.layout import DroneSlot, connection_string, drone_slots
 from pipeline.drones_battle.core.types import RawState, Vec3
-from pipeline.math.geodesy import gps_to_ned
+from pipeline.math.geodesy import gps_to_ned, ned_to_gps
 
-from dronekit import Vehicle, VehicleMode, connect  # noqa: E402
+from dronekit import LocationGlobalRelative, Vehicle, VehicleMode, connect  # noqa: E402
 from pymavlink import mavutil  # noqa: E402
 
 VELOCITY_ONLY_MASK = 0b0000111111000111
 FORCE_DISARM_MAGIC = 21196
 GLOBAL_POSITION_INT_ID = 33
+SLOT_TOLERANCE_M = 3.0
 
 
 @dataclass
@@ -44,6 +45,7 @@ class _Telemetry:
 
 class SitlBackend:
     realtime = True
+    simulated_time = False
 
     def __init__(self, config: ArenaConfig) -> None:
         self.config = config
@@ -56,6 +58,11 @@ class SitlBackend:
 
     # ------------------------------------------------------------------ setup
     def connect(self) -> None:
+        """Connects once; on later calls (next match of a tournament) brings the drones home first."""
+        if self.vehicles:
+            self._killed.clear()
+            self._return_to_slots()
+            return
         with ThreadPoolExecutor(max_workers=len(self.slots)) as pool:
             futures = {i: pool.submit(self._connect_one, slot) for i, slot in self.slots.items()}
             for drone_id, future in futures.items():
@@ -174,6 +181,68 @@ class SitlBackend:
 
     def now(self) -> float:
         return time.monotonic() - self._t0
+
+    def end_match(self) -> None:
+        """Between tournament matches: surviving drones hover until the next ``connect``."""
+        for drone_id in self.vehicles:
+            if drone_id not in self._killed:
+                try:
+                    self.send_velocity(drone_id, (0.0, 0.0, 0.0))
+                except Exception as exc:  # noqa: BLE001
+                    print(f"  drone {drone_id}: {exc}")
+
+    # ------------------------------------------------------------------ reset between matches
+    def _return_to_slots(self) -> None:
+        """Flies every drone back to its start slot and lands it there (parallel, with a timeout).
+
+        Shot-down drones are on the ground somewhere in the arena: they are armed
+        again, take off and fly back. RTL is not used on purpose: arming sets the
+        home position, so a drone re-armed where it crashed would "return" there.
+        """
+        away = []
+        states = self.read_states()
+        for drone_id, vehicle in self.vehicles.items():
+            slot = np.array(self.slots[drone_id].start_ned, dtype=float)
+            distance = float(np.linalg.norm(states[drone_id].pos[:2] - slot[:2]))
+            if vehicle.armed or distance > SLOT_TOLERANCE_M:
+                away.append(drone_id)
+        if not away:
+            return
+        print(f"Returning drones {away} to their start positions...")
+        with ThreadPoolExecutor(max_workers=len(away)) as pool:
+            for future in [pool.submit(self._fly_to_slot_and_land, i) for i in away]:
+                future.result()
+        print("All drones are back at their start positions.")
+
+    def _fly_to_slot_and_land(self, drone_id: int) -> None:
+        vehicle = self.vehicles[drone_id]
+        deadline = time.monotonic() + self.config.sitl.reset_timeout_s
+        slot = self.slots[drone_id]
+        transit_alt = self.config.arena.takeoff_alt_m
+
+        def wait(condition: Callable[[], bool], what: str) -> None:
+            while not condition():
+                if time.monotonic() > deadline:
+                    raise TimeoutError(f"Drone {drone_id}: {what} timed out")
+                time.sleep(0.5)
+
+        if not vehicle.armed:
+            wait(lambda: vehicle.is_armable, "waiting until armable")
+            vehicle.mode = VehicleMode("GUIDED")
+            wait(lambda: vehicle.mode.name == "GUIDED", "switching to GUIDED")
+            vehicle.armed = True
+            wait(lambda: vehicle.armed, "arming")
+            vehicle.simple_takeoff(transit_alt)
+            wait(lambda: -self.read_states()[drone_id].pos[2] > 0.8 * transit_alt, "take-off")
+        else:
+            vehicle.mode = VehicleMode("GUIDED")
+            wait(lambda: vehicle.mode.name == "GUIDED", "switching to GUIDED")
+        lat, lon, _ = ned_to_gps(self.config.arena.origin, slot.start_ned[0], slot.start_ned[1], 0.0)
+        vehicle.simple_goto(LocationGlobalRelative(lat, lon, transit_alt))
+        target = np.array(slot.start_ned[:2], dtype=float)
+        wait(lambda: float(np.linalg.norm(self.read_states()[drone_id].pos[:2] - target)) < 1.0, "flying home")
+        vehicle.mode = VehicleMode("LAND")
+        wait(lambda: not vehicle.armed, "landing")
 
     def shutdown(self) -> None:
         end_mode = self.config.sitl.end_mode

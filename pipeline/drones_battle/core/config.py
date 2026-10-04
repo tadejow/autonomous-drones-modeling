@@ -104,6 +104,7 @@ class SitlSection:
     port_step: int = 10
     connect_timeout_s: float = 60.0
     takeoff_timeout_s: float = 90.0
+    reset_timeout_s: float = 180.0
     stale_after_s: float = 1.0
     position_rate_hz: float = 10.0
     wind_speed_mps: float = 0.0

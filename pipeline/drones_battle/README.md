@@ -10,6 +10,26 @@ Zgodnie z resztą kursu kod jest po angielsku (PEP 8, type hints), a dokumentacj
 
 Wszystkie polecenia uruchamiamy z **katalogu głównego repozytorium**.
 
+### GUI: drużyny studentów, walki i turnieje
+
+```bash
+python -m pipeline.drones_battle.arena_gui
+```
+
+1. Zgłoszenia studentów (katalogi `<numer_indeksu>/` albo pliki `<numer_indeksu>.zip`) wrzucamy do [`student_teams/`](student_teams/README.md). Tam też jest dokładny opis, jak student ma przygotować swój katalog, oraz szablon `_szablon/`.
+2. GUI rozpakowuje ZIP-y i sprawdza każdą drużynę w osobnym procesie (czy są `attacker.py` i `defender.py`, czy się importują, czy zwracają poprawne komendy w 3 vs 3 i 5 vs 5, ile trwa wywołanie). Status: zielony OK, pomarańczowy z uwagami, czerwony BŁĄD (dwuklik = szczegóły z tracebackiem z kodu studenta).
+3. **Walka**: wybierz drużynę atakującą i broniącą, kliknij *Walka*. Okno 3D pokazuje mecz; po zamknięciu okna wynik jest w dzienniku.
+4. **Turniej**: zaznacz drużyny (kolumna ☐ albo *Zaznacz poprawne*) i kliknij *Turniej*. Każda para gra w obu rolach (`rundy na parę` razy). Mecze lecą jeden po drugim w tym samym oknie 3D, a po ostatnim otwiera się okno z **tabelą wyników**, macierzą „kto kogo pokonał” i listą meczów (dwuklik = powtórka).
+5. Ustawienia: format 3 vs 3 / 5 vs 5, fizyka (model kinematyczny albo SITL; przyciski *Uruchom/Zatrzymaj SITL* tylko na Linuksie), tempo (1×, 2×, 4× albo bez wizualizacji), pauza po meczu. *Przerwij* zatrzymuje mecz lub turniej (wyniki częściowe też są pokazywane).
+6. Wyniki i nagrania lądują w `matches/gui/turniej_<data>/`: `wyniki.md`, `tabela.csv`, `mecze.csv` oraz `.jsonl` każdego meczu.
+
+Bez GUI to samo da się zrobić z wiersza poleceń:
+
+```bash
+python -m pipeline.drones_battle.core.submissions             # sprawdzenie wszystkich katalogów studentów
+python -m pipeline.drones_battle.tournament --submissions --rounds 2
+```
+
 ### Bez symulatora (Windows, Linux, macOS)
 
 ```bash
@@ -173,6 +193,7 @@ Do debugowania z breakpointami (PyCharm): `--inline`, wtedy funkcja działa w ty
 
 ```text
 pipeline/drones_battle/
+├── arena_gui.py            # GUI (tkinter): drużyny studentów, walka, turniej, tabela wyników
 ├── arena_orchestrator.py   # CLI + klasa Match: pętla 10 Hz
 ├── arena_visualizer.py     # ArenaVisualizer (2 widoki 3D + opcjonalna mapa 2D), osobny proces
 ├── team_attacker.py        # szablon studenta
@@ -189,11 +210,13 @@ pipeline/drones_battle/
 │   ├── sandbox.py          # strategie w osobnych procesach z budżetem czasu
 │   ├── recorder.py         # zapis JSONL
 │   ├── clock.py            # pętla o stałej częstotliwości, jitter
+│   ├── submissions.py      # katalogi studentów: wykrywanie, ZIP-y, walidacja w osobnym procesie
 │   └── types.py, compat.py
 ├── backends/
 │   ├── kinematic.py        # model punktu materialnego, bez SITL
 │   └── sitl.py             # DroneKit + ArduPilot SITL
 ├── teams/                  # baseline, hunters, tricksters, pincer, wolfpack
+├── student_teams/          # zgłoszenia studentów (poza gitem) + README z formatem + _szablon/
 └── tests/                  # pytest, bez SITL
 ```
 
