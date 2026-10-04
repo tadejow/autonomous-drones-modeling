@@ -67,6 +67,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("recording")
     parser.add_argument("--save", default=None, help="output .gif or .mp4 (needs ffmpeg for mp4)")
     parser.add_argument("--fps", type=int, default=10)
+    parser.add_argument("--dpi", type=int, default=60, help="resolution of the exported file")
     parser.add_argument("--step", type=int, default=1, help="use every N-th frame")
     parser.add_argument("--topdown", action="store_true")
     args = parser.parse_args(argv)
@@ -96,9 +97,11 @@ def main(argv: Optional[list[str]] = None) -> None:
             visualizer.render(frames[index]["drones"], huds[index])
             return []
 
-        animation = FuncAnimation(visualizer.fig, advance, frames=len(frames), blit=False)
+        # Hold the final frame (result banner) for two seconds.
+        sequence = list(range(len(frames))) + [len(frames) - 1] * (2 * args.fps)
+        animation = FuncAnimation(visualizer.fig, advance, frames=sequence, blit=False)
         writer = PillowWriter(fps=args.fps) if args.save.endswith(".gif") else FFMpegWriter(fps=args.fps)
-        animation.save(args.save, writer=writer)
+        animation.save(args.save, writer=writer, dpi=args.dpi)
         print(f"Saved {args.save}")
         return
 

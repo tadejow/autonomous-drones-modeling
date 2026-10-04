@@ -62,6 +62,27 @@ python -m pipeline.drones_battle.replay pipeline/drones_battle/matches/<plik>.js
 python -m pipeline.drones_battle.replay <plik>.jsonl --save walka.gif --step 5
 ```
 
+### Przykładowe walki
+
+Nagrane na backendzie kinematycznym (bez SITL) z drużynami z `teams/`, losowe przesunięcie startu do 3 m. Obok każdego GIF-a leży nagranie `.jsonl`, które można odtworzyć przez `replay`. GIF-y odtwarzane są w czasie rzeczywistym (co druga klatka, 5 kl./s).
+
+| Plik | Atak → obrona | Wynik | Co widać |
+|---|---|---|---|
+| [01](examples/01_baseline_vs_baseline.gif) | baseline → baseline | atakujący, 15,7 s | szablony studentów: proste lecenie do celu kontra pościg za najbliższym |
+| [02](examples/02_baseline_vs_hunters_kamikaze.gif) | baseline → hunters | obrońcy, 8,4 s | optymalny przydział i przechwycenie predykcyjne: trzy zderzenia kamikaze naraz |
+| [03](examples/03_hunters_evade_tricksters.gif) | hunters → tricksters | atakujący, 22,8 s | odpychanie kulombowskie od obrońców pozwala ominąć straż i dotrzeć do celu |
+| [04](examples/04_tricksters_decoy_vs_hunters.gif) | tricksters → hunters | obrońcy, 12,7 s | atak z flank i opóźniony „biegacz” nie przechodzi przez przechwytywanie |
+| [05](examples/05_tricksters_vs_tricksters.gif) | tricksters → tricksters | obrońcy, 22,2 s | straż na linii baza–atakujący wyłapuje kolejno flankujących i biegacza |
+
+![Atakujący omijają straż](examples/03_hunters_evade_tricksters.gif)
+
+Nowe nagranie:
+
+```bash
+python -m pipeline.drones_battle.arena_orchestrator --backend kinematic --fast --no-viz     --attacker pipeline.drones_battle.teams.hunters.attacker     --defender pipeline.drones_battle.teams.tricksters.defender --seed 0 --jitter 3 --record walka.jsonl
+python -m pipeline.drones_battle.replay walka.jsonl --save walka.gif --topdown --step 2 --fps 5
+```
+
 ---
 
 ## Zasady gry

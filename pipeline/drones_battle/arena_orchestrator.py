@@ -279,6 +279,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--no-viz", action="store_true", help="do not open the 3D views")
     parser.add_argument("--inline", action="store_true", help="run strategies in-process (debugging)")
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--jitter", type=float, default=0.0, help="kinematic only: random start offset (m)")
     parser.add_argument("--record", default=None, help="JSONL file (default: matches/<timestamp>.jsonl)")
     parser.add_argument("--no-record", action="store_true")
     args = parser.parse_args(argv)
@@ -293,7 +294,7 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     result = run_match(
         config, args.attacker, args.defender, args.backend, fast=args.fast, visualize=not args.no_viz,
-        record_path=record, seed=args.seed,
+        record_path=record, seed=args.seed, start_jitter_m=args.jitter,
     )
     print(json.dumps(result.as_dict()["stats"], indent=2))
     if record:
