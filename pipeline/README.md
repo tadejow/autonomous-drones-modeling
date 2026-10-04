@@ -1,6 +1,6 @@
 # Pipeline - Architektura Autonomicznych Dronów
 
-Katalog `pipeline` zawiera ujednolicony, zgodny ze standardami inżynierii oprogramowania (ISO) zbiór modułów do symulacji, kontroli i wizualizacji bezzałogowych statków powietrznych (BSP). Kod ten zastępuje i rozwija skrypty szkoleniowe z fazy POC (01-05).
+Katalog `pipeline` zawiera ujednolicony, zgodny ze standardami inżynierii oprogramowania (ISO) zbiór modułów do symulacji, kontroli i wizualizacji bezzałogowych statków powietrznych (BSP). Kod ten zastępuje i rozwija skrypty szkoleniowe z fazy POC (`labs/01`-`labs/05`).
 
 ## Struktura Pakietu
 

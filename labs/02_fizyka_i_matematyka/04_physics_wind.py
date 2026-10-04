@@ -48,7 +48,7 @@ def main():
         time.sleep(1)
 
     import sys, os
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
     from pipeline.visualization.plotter import DronePlotter
     plotter = DronePlotter(title="Fizyka: Walka z Wiatrem", trail_length=500)
     plotter.set_view(elev=15, azim=-60)
