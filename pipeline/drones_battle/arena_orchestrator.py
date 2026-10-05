@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -31,7 +32,8 @@ from pipeline.drones_battle.backends import make_backend
 from pipeline.drones_battle.backends.base import PhysicsBackend
 from pipeline.drones_battle.core.clock import FixedRateClock
 from pipeline.drones_battle.core.config import ArenaConfig, load_config
-from pipeline.drones_battle.core.recorder import JsonlRecorder, NullRecorder, Recorder
+from pipeline.drones_battle.core.match_analysis import analyze_recording
+from pipeline.drones_battle.core.recorder import JsonlRecorder, NullRecorder, Recorder, read_recording
 from pipeline.drones_battle.core.referee import Referee
 from pipeline.drones_battle.core.safety import SafetyLimiter
 from pipeline.drones_battle.core.sandbox import StrategyCall, TeamController, make_controller
@@ -218,13 +220,34 @@ class Match:
             "defenders": self.defenders.stats(),
             "loop": clock.stats(),
         }
+        result.stats["closest_approaches"] = {
+            f"{a}-{d}": [round(dist, 2), round(when, 2)] for (a, d), (dist, when) in self.referee.closest.items()
+        }
+        closest = self.referee.closest_summary()
+        if closest:
+            self._log("Closest approach (attacker-defender): " + ", ".join(closest)
+                      + f"; hit below {game.kill_radius_m:.1f} m")
         diagnostics = getattr(self.backend, "diagnostics", None)
         if diagnostics is not None:
-            result.stats["telemetry"] = diagnostics()
-            lag = result.stats["telemetry"].get("telemetry_lag_max_s", 0.0)
-            if lag > 1.0:
-                self._log(f"WARNING: telemetry fell up to {lag:.1f} s behind the simulators "
-                          "(machine overloaded? see README: hardware)")
+            telemetry = diagnostics()
+            result.stats["telemetry"] = telemetry
+            self._log(
+                f"Telemetry: {telemetry.get('position_rate_min_hz', 0):.1f}-"
+                f"{telemetry.get('position_rate_max_hz', 0):.1f} positions/s per drone, "
+                f"max delay {telemetry.get('telemetry_lag_max_s', 0):.2f} s, "
+                f"duplicates {telemetry.get('duplicate_messages', 0)}"
+            )
+            if telemetry.get("telemetry_lag_max_s", 0.0) > 1.0:
+                self._log("WARNING: telemetry fell more than 1 s behind the simulators (machine overloaded?)")
+            if 0 < telemetry.get("position_rate_min_hz", 0.0) < 0.6 * game.tick_hz:
+                self._log("WARNING: some drones report their position less often than the arena ticks; "
+                          "hits can be missed")
+        machine = _machine_load()
+        if machine:
+            result.stats["machine"] = machine
+            if machine["load_1min"] > machine["cpus"]:
+                self._log(f"WARNING: machine overloaded during the match: load {machine['load_1min']:.1f} "
+                          f"on {machine['cpus']} CPUs (simulators and the 3D view slow down, hits can be missed)")
         self.recorder.write_result(result.as_dict())
         banner = f"{result.winner.upper()} WIN ({result.reason.value}, t = {result.time:.1f} s)"
         self._log(banner)
@@ -399,6 +422,17 @@ def _takeoff_with_preview(backend: PhysicsBackend, config: ArenaConfig, visualiz
     _publish_preview(visualizer, backend, config, title, "READY")
 
 
+def _machine_load() -> dict[str, float]:
+    """1-minute load average and CPU count (Linux/macOS; empty on Windows)."""
+    if not hasattr(os, "getloadavg"):
+        return {}
+    try:
+        load = os.getloadavg()[0]
+    except OSError:
+        return {}
+    return {"cpus": float(os.cpu_count() or 1), "load_1min": round(load, 2)}
+
+
 def _short(ref: str) -> str:
     """Readable team name from a module path or a file path (``.../300538/attacker.py`` -> ``300538``)."""
     if ref.endswith(".py") or "/" in ref or "\\" in ref:
@@ -450,6 +484,9 @@ def main(argv: Optional[list[str]] = None) -> None:
     print(json.dumps(result.as_dict()["stats"], indent=2))
     if record:
         print(f"Recording: {record}")
+        print("Match analysis (python -m pipeline.drones_battle.replay latest --analyze):")
+        for line in analyze_recording(*read_recording(record)):
+            print("  " + line)
 
 
 if __name__ == "__main__":

@@ -151,7 +151,9 @@ while read -r instance sysid lat lon alt heading port map_port team; do
         outputs="--no-mavproxy"
         MAP_MASTERS+=" --master=tcp:127.0.0.1:$map_port"
     else
-        outputs="--out=udp:127.0.0.1:$port --out=udp:127.0.0.1:$map_port"
+        # --no-extra-ports: sim_vehicle.py would add its own --out 127.0.0.1:(14550 + 10 i), the
+        # orchestrator's port, and every message would then reach the orchestrator twice.
+        outputs="--no-extra-ports --out=udp:127.0.0.1:$port --out=udp:127.0.0.1:$map_port"
         MAP_MASTERS+=" --master=udp:127.0.0.1:$map_port"
     fi
     echo "  SysID $sysid ($team): $lat, $lon, heading $heading -> port $port"
