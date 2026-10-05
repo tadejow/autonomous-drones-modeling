@@ -21,9 +21,9 @@
 #                   when it exists (the one from ArduPilot's install script, it has wxPython
 #                   for the map); otherwise the current python3 is used
 #   ARENA_NO_MAP=1  skip the MAVProxy map
-#   ARENA_MAP_DELAY seconds to wait before opening the map (default 25). MAVProxy gives the
-#                   map window only 5 s to start; while six simulators are booting that is
-#                   often too little ("map not ready": a blank window that never shows drones)
+#   ARENA_MAP_DELAY seconds to wait before opening the map (default 15), so that the
+#                   simulators are up; mavproxy_arena.py then gives the map window up to 60 s
+#                   to start (MAVProxy alone allows 5 s and leaves a blank window otherwise)
 #   ARENA_CONFIG    configuration file (default arena_config.toml), e.g. arena_config_5v5.toml;
 #                   pass the same file to the orchestrator with --config
 set -euo pipefail
@@ -162,15 +162,17 @@ done < <(echo "$LAYOUT" | grep -v '^mode')
 # --- window 1: one MAVProxy map with all six drones ---------------------------
 if [[ "${ARENA_NO_MAP:-0}" != "1" ]]; then
     echo "Waiting for the simulators before opening the map..."
-    sleep "${ARENA_MAP_DELAY:-25}"
+    sleep "${ARENA_MAP_DELAY:-15}"
     # mavproxy_arena.py (a MAVProxy module from this repository) draws attackers red and
     # defenders blue and fits the view to the drones (it hides the standard icons itself,
     # so if it fails to load the map still shows the drones).
     map_teams="$(echo "$LAYOUT" | grep -v '^mode' |
         awk '{ printf "%s%s:%s", (NR > 1 ? "," : ""), $2, ($9 == "attackers" ? "red" : "blue") }')"
-    map_cmds="map follow 0; module load pipeline.drones_battle.mavproxy_arena"
+    # The module opens the map itself (with a longer start-up limit than MAVProxy's 5 s);
+    # "module load map" only matters if the module fails to load.
+    map_cmds="module load pipeline.drones_battle.mavproxy_arena; module load map"
     launch "map" "${ACTIVATE}export PYTHONPATH=$REPO_DIR ARENA_MAP_TEAMS=$map_teams && \
-        $MAVPROXY $MAP_MASTERS --map --cmd='$map_cmds'"
+        $MAVPROXY $MAP_MASTERS --cmd='$map_cmds'"
     place_map_window &
 fi
 minimize_arena_terminals

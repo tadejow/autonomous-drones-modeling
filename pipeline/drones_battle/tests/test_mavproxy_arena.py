@@ -27,6 +27,9 @@ class FakeSlipMap:
     def set_center(self, lat: float, lon: float) -> None:
         self.calls.append(("center", lat, lon))
 
+    def set_follow(self, enable: int) -> None:
+        self.calls.append(("follow", enable))
+
 
 @pytest.fixture()
 def arena_module(monkeypatch: pytest.MonkeyPatch):
@@ -41,6 +44,10 @@ def arena_module(monkeypatch: pytest.MonkeyPatch):
 
         def add_command(self, name, callback, description, completions=None):
             self.commands[name] = callback
+
+    class MPSlipMap:
+        def _wait_ready(self, timeout):
+            return timeout  # the test only checks which limit is used
 
     class SlipIcon:
         def __init__(self, key, latlon, img, **_kwargs):
@@ -57,6 +64,7 @@ def arena_module(monkeypatch: pytest.MonkeyPatch):
     fake["MAVProxy.modules.lib.mp_module"].MPModule = MPModule
     fake["MAVProxy.modules.lib"].mp_module = fake["MAVProxy.modules.lib.mp_module"]
     fake["MAVProxy.modules.mavproxy_map.mp_slipmap"].SlipIcon = SlipIcon
+    fake["MAVProxy.modules.mavproxy_map.mp_slipmap"].MPSlipMap = MPSlipMap
     fake["MAVProxy.modules.mavproxy_map.mp_slipmap"].SlipTrail = lambda: None
     fake["MAVProxy.modules.mavproxy_map"].mp_slipmap = fake["MAVProxy.modules.mavproxy_map.mp_slipmap"]
     for name, module in fake.items():
@@ -78,6 +86,32 @@ def _mpstate(slipmap):
     """MAVProxy state with the map module (public, with its settings) when ``slipmap`` is given."""
     modules = {} if slipmap is None else {"map": SimpleNamespace(map_settings=FakeSettings())}
     return SimpleNamespace(map=slipmap, modules=modules)
+
+
+def test_module_opens_the_map_with_a_longer_limit(arena_module) -> None:
+    mpstate = SimpleNamespace(map=None, modules={})
+
+    def load_module(name):
+        assert name == "map"
+        mpstate.map = FakeSlipMap()
+        mpstate.modules["map"] = SimpleNamespace(map_settings=FakeSettings())
+
+    mpstate.load_module = load_module
+    module = arena_module.init(mpstate)
+    slip_class = sys.modules["MAVProxy.modules.mavproxy_map.mp_slipmap"].MPSlipMap
+    assert slip_class()._wait_ready(5.0) == arena_module.MAP_START_TIMEOUT_S
+    assert mpstate.map.calls == [("follow", 0)]
+    assert module.default_icons_hidden is True
+
+
+def test_map_failure_keeps_the_module_alive(arena_module) -> None:
+    def load_module(_name):
+        raise RuntimeError("map not ready")
+
+    mpstate = SimpleNamespace(map=None, modules={}, load_module=load_module)
+    module = arena_module.init(mpstate)
+    module.mavlink_packet(_position(1, -35.3615, 149.165))
+    assert module.positions
 
 
 def _position(sysid: int, lat: float, lon: float):

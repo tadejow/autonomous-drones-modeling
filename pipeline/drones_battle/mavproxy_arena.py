@@ -2,7 +2,14 @@
 
 ``start_arena.sh`` loads it into the combined map MAVProxy::
 
-    mavproxy.py --master=... --map --cmd="map follow 0; module load pipeline.drones_battle.mavproxy_arena"
+    mavproxy.py --master=... --cmd="module load pipeline.drones_battle.mavproxy_arena; module load map"
+
+* MAVProxy gives the map window only 5 s to start and otherwise fails with
+  "map not ready", leaving an empty window that never shows a drone. On the
+  lab machines that happened even with the simulators idle. This module
+  therefore loads the map itself, allowing ``MAP_START_TIMEOUT_S``. (The
+  ``module load map`` after it is a fallback that only runs if this module
+  failed to load.)
 
 * The standard map draws every vehicle as the same red icon. Once loaded,
   this module hides those (map settings ``showahrspos``/``showgpspos``) and
@@ -28,6 +35,22 @@ from MAVProxy.modules.lib import mp_module
 
 METRES_PER_DEGREE = 111320.0
 FIT_DELAYS_S = (2.0, 6.0)
+MAP_START_TIMEOUT_S = 60.0
+
+
+def allow_slow_map_start():
+    """Raises MAVProxy's hard-coded 5 s limit for the map window to ``MAP_START_TIMEOUT_S``."""
+    from MAVProxy.modules.mavproxy_map import mp_slipmap
+
+    original = mp_slipmap.MPSlipMap._wait_ready
+    if getattr(original, "arena_patched", False):
+        return
+
+    def wait_ready(self, timeout):
+        return original(self, max(timeout, MAP_START_TIMEOUT_S))
+
+    wait_ready.arena_patched = True
+    mp_slipmap.MPSlipMap._wait_ready = wait_ready
 
 
 def parse_teams(spec):
@@ -64,7 +87,22 @@ class ArenaMapModule(mp_module.MPModule):
             print("arena: team colours for SysIDs %s" % sorted(self.colours))
         else:
             print("arena: ARENA_MAP_TEAMS is empty, every drone will be red")
+        self.load_map()
         self.hide_default_icons()
+
+    def load_map(self):
+        if self.module("map") is not None:
+            return
+        try:
+            allow_slow_map_start()
+            print("arena: opening the map (up to %.0f s)..." % MAP_START_TIMEOUT_S)
+            self.mpstate.load_module("map")
+        except Exception as exc:  # the arena must keep running without a map
+            print("arena: could not open the map: %s" % exc)
+            return
+        slipmap = self._slipmap()
+        if slipmap is not None:
+            slipmap.set_follow(0)  # keep the whole arena in view instead of one drone
 
     def hide_default_icons(self):
         """Turns off the standard (identical) vehicle icons of the map module."""
