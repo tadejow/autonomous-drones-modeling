@@ -2,12 +2,14 @@
 
 ``start_arena.sh`` loads it into the combined map MAVProxy::
 
-    mavproxy.py --master=... --map --cmd="map set showahrspos 0; map set showgpspos 0; map follow 0;
-                                           module load pipeline.drones_battle.mavproxy_arena"
+    mavproxy.py --master=... --map --cmd="map follow 0; module load pipeline.drones_battle.mavproxy_arena"
 
-* The standard map draws every vehicle as the same red icon. This module
-  hides those (``showahrspos 0``) and draws its own icons: attackers red,
-  defenders blue (as in the 3D views), labelled with the SysID.
+* The standard map draws every vehicle as the same red icon. Once loaded,
+  this module hides those (map settings ``showahrspos``/``showgpspos``) and
+  draws its own: attackers red, defenders blue (as in the 3D views), labelled
+  with the SysID. If the module cannot load, the standard icons stay.
+* It is a multi-vehicle module: MAVProxy passes other modules only the
+  packets of its current target vehicle.
 * The view is fitted to the drones once all of them report a position, and
   once more a few seconds later: the map keeps its top-left corner when
   ``start_arena.sh`` resizes the window, which would otherwise shift the view.
@@ -50,15 +52,31 @@ def fit(positions):
 
 class ArenaMapModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(ArenaMapModule, self).__init__(mpstate, "arena", "drone battle arena map")
+        super(ArenaMapModule, self).__init__(mpstate, "arena", "drone battle arena map", multi_vehicle=True)
         self.colours = parse_teams(os.environ.get("ARENA_MAP_TEAMS", ""))
         self.positions = {}
         self.icons = set()
         self.all_seen_at = None
         self.pending_fits = list(FIT_DELAYS_S)
+        self.default_icons_hidden = False
         self.add_command("arena", self.cmd_arena, "arena map helpers", ["center"])
-        if not self.colours:
+        if self.colours:
+            print("arena: team colours for SysIDs %s" % sorted(self.colours))
+        else:
             print("arena: ARENA_MAP_TEAMS is empty, every drone will be red")
+        self.hide_default_icons()
+
+    def hide_default_icons(self):
+        """Turns off the standard (identical) vehicle icons of the map module."""
+        if self.default_icons_hidden:
+            return
+        map_module = self.module("map")
+        settings = getattr(map_module, "map_settings", None)
+        if settings is None:
+            return
+        settings.set("showahrspos", 0)
+        settings.set("showgpspos", 0)
+        self.default_icons_hidden = True
 
     def _slipmap(self):
         return getattr(self.mpstate, "map", None)
@@ -91,6 +109,7 @@ class ArenaMapModule(mp_module.MPModule):
         slipmap.set_position(key, (lat, lon), rotation=heading, label=str(sysid), colour=(255, 255, 255))
 
     def idle_task(self):
+        self.hide_default_icons()
         expected = set(self.colours) or set(self.positions)
         if self.all_seen_at is None and expected and expected <= set(self.positions):
             self.all_seen_at = time.time()
@@ -107,6 +126,7 @@ class ArenaMapModule(mp_module.MPModule):
         # Zoom first: changing the zoom moves the view around its top-left corner.
         slipmap.set_zoom(ground_width)
         slipmap.set_center(lat, lon)
+        print("arena: view fitted to %u drones (%.0f m wide)" % (len(self.positions), ground_width))
 
 
 def init(mpstate):

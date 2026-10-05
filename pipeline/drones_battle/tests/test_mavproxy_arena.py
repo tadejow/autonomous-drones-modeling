@@ -31,9 +31,13 @@ class FakeSlipMap:
 @pytest.fixture()
 def arena_module(monkeypatch: pytest.MonkeyPatch):
     class MPModule:
-        def __init__(self, mpstate, name, description=None, **_kwargs):
+        def __init__(self, mpstate, name, description=None, multi_vehicle=False, **_kwargs):
             self.mpstate = mpstate
+            self.multi_vehicle = multi_vehicle
             self.commands = {}
+
+        def module(self, name):
+            return self.mpstate.modules.get(name)
 
         def add_command(self, name, callback, description, completions=None):
             self.commands[name] = callback
@@ -62,6 +66,20 @@ def arena_module(monkeypatch: pytest.MonkeyPatch):
     return importlib.import_module("pipeline.drones_battle.mavproxy_arena")
 
 
+class FakeSettings:
+    def __init__(self) -> None:
+        self.values = {"showahrspos": 1, "showgpspos": 1}
+
+    def set(self, name: str, value: int) -> None:
+        self.values[name] = value
+
+
+def _mpstate(slipmap):
+    """MAVProxy state with the map module (public, with its settings) when ``slipmap`` is given."""
+    modules = {} if slipmap is None else {"map": SimpleNamespace(map_settings=FakeSettings())}
+    return SimpleNamespace(map=slipmap, modules=modules)
+
+
 def _position(sysid: int, lat: float, lon: float):
     return SimpleNamespace(
         get_type=lambda: "GLOBAL_POSITION_INT", get_srcSystem=lambda: sysid,
@@ -71,7 +89,11 @@ def _position(sysid: int, lat: float, lon: float):
 
 def test_team_colours_and_view_fit(arena_module, monkeypatch: pytest.MonkeyPatch) -> None:
     slipmap = FakeSlipMap()
-    module = arena_module.init(SimpleNamespace(map=slipmap))
+    mpstate = _mpstate(slipmap)
+    module = arena_module.init(mpstate)
+    # MAVProxy passes other vehicles' packets only to multi-vehicle modules.
+    assert module.multi_vehicle is True
+    assert mpstate.modules["map"].map_settings.values == {"showahrspos": 0, "showgpspos": 0}
     clock = [1000.0]
     monkeypatch.setattr(arena_module.time, "time", lambda: clock[0])
 
@@ -99,7 +121,8 @@ def test_team_colours_and_view_fit(arena_module, monkeypatch: pytest.MonkeyPatch
 
 def test_without_map_or_teams(arena_module, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ARENA_MAP_TEAMS", "")
-    module = arena_module.init(SimpleNamespace(map=None))
+    module = arena_module.init(_mpstate(None))
+    assert module.default_icons_hidden is False  # no map module: the standard icons are left alone
     module.mavlink_packet(_position(3, -35.3615, 149.165))  # no map yet: nothing breaks
     module.fit_view()
     assert module.positions == {3: pytest.approx((-35.3615, 149.165))}
