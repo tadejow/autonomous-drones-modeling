@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import queue
+import shutil
 import subprocess
+import sys
 import time
 from collections import deque
 from typing import Any, Optional
@@ -37,6 +39,8 @@ from pipeline.drones_battle.core.config import ArenaConfig, load_config  # noqa:
 from pipeline.math.geodesy import ned_to_enu  # noqa: E402
 
 TEAM_COLORS = {"attackers": "red", "defenders": "blue"}
+TITLE_BAR_PX = 32
+LAYOUT_RETRIES_S = (0.0, 1.0, 3.0)
 DEAD_COLOR = "gray"
 
 
@@ -49,8 +53,8 @@ def _sphere(center_enu: tuple[float, float, float], radius: float, steps: int = 
     )
 
 
-def _work_area(window: Any) -> tuple[int, int, int, int]:
-    """Usable screen area (without panels) as ``(x, y, width, height)``."""
+def _x11_work_area() -> Optional[tuple[int, int, int, int]]:
+    """Usable screen area without panels ``(x, y, width, height)`` from the X11 window manager."""
     try:
         output = subprocess.run(
             ["xprop", "-root", "_NET_WORKAREA"], capture_output=True, text=True, timeout=2, check=True
@@ -60,8 +64,39 @@ def _work_area(window: Any) -> tuple[int, int, int, int]:
             return values[0], values[1], values[2], values[3]
     except (OSError, subprocess.SubprocessError, IndexError, ValueError):
         pass
+    return None
+
+
+def _work_area(window: Any) -> tuple[int, int, int, int]:
+    """Usable screen area (without panels) as ``(x, y, width, height)``."""
+    area = _x11_work_area()
+    if area is not None:
+        return area
     # Fallback (e.g. Windows): whole screen minus a typical taskbar.
     return 0, 0, int(window.winfo_screenwidth()), int(window.winfo_screenheight()) - 48
+
+
+def _right_half(area: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+    """``(x, y, width, height)`` of the right half of a work area, minus a title bar."""
+    x, y, width, height = area
+    half = width // 2
+    return x + half, y, width - half, max(height - TITLE_BAR_PX, 200)
+
+
+def _wmctrl_place(title: str, x: int, y: int, width: int, height: int) -> None:
+    """Asks the X11 window manager directly (wmctrl), as start_arena.sh does for the map.
+
+    Some window managers ignore Tk's geometry request for a window they have
+    maximized; wmctrl first removes the maximized state, then moves and resizes.
+    """
+    if not sys.platform.startswith("linux") or shutil.which("wmctrl") is None or not title:
+        return
+    for args in (["-b", "remove,maximized_vert,maximized_horz"], ["-e", f"0,{x},{y},{width},{height}"]):
+        try:
+            subprocess.run(["wmctrl", "-F", "-r", title, *args], timeout=2, check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError):
+            return
 
 
 class ArenaVisualizer:
@@ -83,7 +118,16 @@ class ArenaVisualizer:
 
         plt.ion()
         columns = 3 if self.topdown else 2
-        self.fig = plt.figure(figsize=(8 * columns, 8))
+        self._pending_layout: Optional[str] = window_layout or viz.window_layout
+        figsize: tuple[float, float] = (8.0 * columns, 8.0)
+        area = _x11_work_area() if self._pending_layout == "right_half" else None
+        if area is not None:
+            # Open the window at its final size: a window larger than the screen gets maximized
+            # by some window managers (xfwm4), which then ignore any later geometry request.
+            _, _, width, height = _right_half(area)
+            dpi = float(matplotlib.rcParams["figure.dpi"])
+            figsize = (width / dpi, (height - 40) / dpi)
+        self.fig = plt.figure(figsize=figsize)
         self.fig.subplots_adjust(left=0.0, right=1.0, bottom=0.14, top=0.84, wspace=0.0)
         try:
             self.fig.canvas.manager.set_window_title(title)
@@ -102,15 +146,18 @@ class ArenaVisualizer:
         self.trails: dict[tuple[int, int], Any] = {}
         self.markers: dict[tuple[int, int], Any] = {}
         self.hit_artists: list[Any] = []
-        self._pending_layout: Optional[str] = window_layout or viz.window_layout
+        self._layout_retries = list(LAYOUT_RETRIES_S)
+        self._mapped_at: Optional[float] = None
 
     # ------------------------------------------------------------------ window
     def apply_window_layout(self) -> None:
         """Puts the Tk window on the right half of the work area (or maximizes it).
 
         ``start_arena.sh`` places the MAVProxy map on the left half, so together
-        the two windows fill the screen. Runs once, after the window is shown:
-        a geometry set earlier is overridden when matplotlib maps the window.
+        the two windows fill the screen. Called after every GUI pause; it acts
+        only once the window is shown (a geometry set earlier is overridden when
+        matplotlib maps the window) and repeats at ``LAYOUT_RETRIES_S`` after
+        that, because window managers may still move a window just after mapping it.
         """
         layout = self._pending_layout
         window = getattr(self.fig.canvas.manager, "window", None)
@@ -119,7 +166,14 @@ class ArenaVisualizer:
             return
         if not window.winfo_ismapped():
             return
-        self._pending_layout = None
+        now = time.monotonic()
+        if self._mapped_at is None:
+            self._mapped_at = now
+        if now - self._mapped_at < self._layout_retries[0]:
+            return
+        self._layout_retries.pop(0)
+        if not self._layout_retries:
+            self._pending_layout = None
         if layout == "maximized":
             try:
                 window.state("zoomed")  # Windows
@@ -129,10 +183,15 @@ class ArenaVisualizer:
                 except Exception:  # noqa: BLE001
                     pass
         elif layout == "right_half":
-            x, y, width, height = _work_area(window)
-            half = width // 2
-            # Height minus a title bar; the WM adds decorations outside the geometry.
-            window.wm_geometry(f"{width - half}x{max(height - 32, 200)}+{x + half}+{y}")
+            x, y, width, height = _right_half(_work_area(window))
+            if sys.platform.startswith("linux"):
+                try:
+                    window.attributes("-zoomed", False)  # undo a maximize by the window manager
+                except Exception:  # noqa: BLE001
+                    pass
+            window.wm_geometry(f"{width}x{height}+{x}+{y}")
+            window.update()
+            _wmctrl_place(window.wm_title(), x, y, width, height)
         window.update()
 
     # ------------------------------------------------------------------ setup
