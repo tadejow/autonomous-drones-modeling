@@ -8,6 +8,12 @@
   matches the MAVProxy map; plotting (N, E, Up) would mirror the scene.
 * Artists are created once and only updated, which is much faster than
   ``ax.clear()`` and keeps the camera still.
+* Blitting: the static scene (panes, grid, ticks, target spheres) is drawn
+  once and cached as a bitmap; each frame restores it and draws only the
+  drones, trails and texts. A full redraw of two 3D axes takes 0.2-1 s,
+  which made the view lag behind the MAVProxy map. For the same reason the
+  window loop never calls ``plt.pause``: on Tk every ``plt.pause`` calls
+  ``show()``, which re-renders the whole figure and raises the window.
 
 ``VisualizerProcess`` runs the visualizer in its own process, so drawing can
 never slow down the 10 Hz control loop of the orchestrator.
@@ -17,7 +23,9 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import queue
+import shutil
 import subprocess
+import sys
 import time
 from collections import deque
 from typing import Any, Optional
@@ -37,6 +45,11 @@ from pipeline.drones_battle.core.config import ArenaConfig, load_config  # noqa:
 from pipeline.math.geodesy import ned_to_enu  # noqa: E402
 
 TEAM_COLORS = {"attackers": "red", "defenders": "blue"}
+TITLE_BAR_PX = 32
+DELAY_SMOOTHING = 0.2
+
+matplotlib.rcParams["figure.raise_window"] = False  # do not pull the window to the front on every update
+LAYOUT_RETRIES_S = (0.0, 1.0, 3.0)
 DEAD_COLOR = "gray"
 
 
@@ -49,8 +62,8 @@ def _sphere(center_enu: tuple[float, float, float], radius: float, steps: int = 
     )
 
 
-def _work_area(window: Any) -> tuple[int, int, int, int]:
-    """Usable screen area (without panels) as ``(x, y, width, height)``."""
+def _x11_work_area() -> Optional[tuple[int, int, int, int]]:
+    """Usable screen area without panels ``(x, y, width, height)`` from the X11 window manager."""
     try:
         output = subprocess.run(
             ["xprop", "-root", "_NET_WORKAREA"], capture_output=True, text=True, timeout=2, check=True
@@ -60,8 +73,44 @@ def _work_area(window: Any) -> tuple[int, int, int, int]:
             return values[0], values[1], values[2], values[3]
     except (OSError, subprocess.SubprocessError, IndexError, ValueError):
         pass
+    return None
+
+
+def _work_area(window: Any) -> tuple[int, int, int, int]:
+    """Usable screen area (without panels) as ``(x, y, width, height)``."""
+    area = _x11_work_area()
+    if area is not None:
+        return area
     # Fallback (e.g. Windows): whole screen minus a typical taskbar.
     return 0, 0, int(window.winfo_screenwidth()), int(window.winfo_screenheight()) - 48
+
+
+def _right_half(area: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+    """``(x, y, width, height)`` of the right half of a work area, minus a title bar."""
+    x, y, width, height = area
+    half = width // 2
+    return x + half, y, width - half, max(height - TITLE_BAR_PX, 200)
+
+
+def _wmctrl_place(title: str, x: int, y: int, width: int, height: int) -> None:
+    """Asks the X11 window manager directly (wmctrl), as start_arena.sh does for the map.
+
+    Some window managers ignore Tk's geometry request for a window they have
+    maximized; wmctrl first removes the maximized state, then moves and resizes.
+    """
+    if not sys.platform.startswith("linux") or shutil.which("wmctrl") is None or not title:
+        return
+    for args in (["-b", "remove,maximized_vert,maximized_horz"], ["-e", f"0,{x},{y},{width},{height}"]):
+        try:
+            subprocess.run(["wmctrl", "-F", "-r", title, *args], timeout=2, check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError):
+            return
+
+
+def _smooth(previous: Optional[float], value: float) -> float:
+    """Exponential moving average used for the on-screen timings."""
+    return value if previous is None else (1 - DELAY_SMOOTHING) * previous + DELAY_SMOOTHING * value
 
 
 class ArenaVisualizer:
@@ -83,7 +132,16 @@ class ArenaVisualizer:
 
         plt.ion()
         columns = 3 if self.topdown else 2
-        self.fig = plt.figure(figsize=(8 * columns, 8))
+        self._pending_layout: Optional[str] = window_layout or viz.window_layout
+        figsize: tuple[float, float] = (8.0 * columns, 8.0)
+        area = _x11_work_area() if self._pending_layout == "right_half" else None
+        if area is not None:
+            # Open the window at its final size: a window larger than the screen gets maximized
+            # by some window managers (xfwm4), which then ignore any later geometry request.
+            _, _, width, height = _right_half(area)
+            dpi = float(matplotlib.rcParams["figure.dpi"])
+            figsize = (width / dpi, (height - 40) / dpi)
+        self.fig = plt.figure(figsize=figsize)
         self.fig.subplots_adjust(left=0.0, right=1.0, bottom=0.14, top=0.84, wspace=0.0)
         try:
             self.fig.canvas.manager.set_window_title(title)
@@ -97,20 +155,37 @@ class ArenaVisualizer:
         if self.ax_top is not None:
             self._setup_top(self.ax_top)
 
-        self.hud_text = self.fig.suptitle("", fontsize=14, fontweight="bold")
-        self.events_text = self.fig.text(0.01, 0.005, "", fontsize=9, family="monospace", va="bottom")
+        # Animated artists are left out of normal redraws and drawn by present() (blitting).
+        self._blit = bool(getattr(self.fig.canvas, "supports_blit", False))
+        self._background: Any = None
+        self.hud_text = self.fig.suptitle("", fontsize=14, fontweight="bold", animated=self._blit)
+        self.events_text = self.fig.text(0.01, 0.005, "", fontsize=9, family="monospace", va="bottom",
+                                         animated=self._blit)
+        self.stats_text = self.fig.text(0.99, 0.005, "", fontsize=8, color="#777777", ha="right", va="bottom",
+                                        animated=self._blit)
         self.trails: dict[tuple[int, int], Any] = {}
         self.markers: dict[tuple[int, int], Any] = {}
-        self.hit_artists: list[Any] = []
-        self._pending_layout: Optional[str] = window_layout or viz.window_layout
+        self.hit_lines = [self._new_line(ax, marker="x", color="black", markersize=14, mew=3, linestyle="")
+                          for ax in self._axes()]
+        self._delay: Optional[float] = None
+        self._max_delay = 0.0
+        self._frame_times: deque[float] = deque(maxlen=20)
+        self._draw_ms: Optional[float] = None
+        self._screen_ms: Optional[float] = None
+        self.full_redraws = 0
+        self.fig.canvas.mpl_connect("draw_event", self._on_draw)
+        self._layout_retries = list(LAYOUT_RETRIES_S)
+        self._mapped_at: Optional[float] = None
 
     # ------------------------------------------------------------------ window
     def apply_window_layout(self) -> None:
         """Puts the Tk window on the right half of the work area (or maximizes it).
 
         ``start_arena.sh`` places the MAVProxy map on the left half, so together
-        the two windows fill the screen. Runs once, after the window is shown:
-        a geometry set earlier is overridden when matplotlib maps the window.
+        the two windows fill the screen. Called after every GUI pause; it acts
+        only once the window is shown (a geometry set earlier is overridden when
+        matplotlib maps the window) and repeats at ``LAYOUT_RETRIES_S`` after
+        that, because window managers may still move a window just after mapping it.
         """
         layout = self._pending_layout
         window = getattr(self.fig.canvas.manager, "window", None)
@@ -119,7 +194,14 @@ class ArenaVisualizer:
             return
         if not window.winfo_ismapped():
             return
-        self._pending_layout = None
+        now = time.monotonic()
+        if self._mapped_at is None:
+            self._mapped_at = now
+        if now - self._mapped_at < self._layout_retries[0]:
+            return
+        self._layout_retries.pop(0)
+        if not self._layout_retries:
+            self._pending_layout = None
         if layout == "maximized":
             try:
                 window.state("zoomed")  # Windows
@@ -129,10 +211,15 @@ class ArenaVisualizer:
                 except Exception:  # noqa: BLE001
                     pass
         elif layout == "right_half":
-            x, y, width, height = _work_area(window)
-            half = width // 2
-            # Height minus a title bar; the WM adds decorations outside the geometry.
-            window.wm_geometry(f"{width - half}x{max(height - 32, 200)}+{x + half}+{y}")
+            x, y, width, height = _right_half(_work_area(window))
+            if sys.platform.startswith("linux"):
+                try:
+                    window.attributes("-zoomed", False)  # undo a maximize by the window manager
+                except Exception:  # noqa: BLE001
+                    pass
+            window.wm_geometry(f"{width}x{height}+{x}+{y}")
+            window.update()
+            _wmctrl_place(window.wm_title(), x, y, width, height)
         window.update()
 
     # ------------------------------------------------------------------ setup
@@ -189,18 +276,18 @@ class ArenaVisualizer:
     def _axes(self) -> list[Any]:
         return [ax for ax in (self.ax_def, self.ax_att, self.ax_top) if ax is not None]
 
+    def _new_line(self, ax: Any, **style: Any) -> Any:
+        """An empty (animated, when blitting) line in a 2D or 3D axes."""
+        empty: list[list[float]] = [[], []] if ax is self.ax_top else [[], [], []]
+        (line,) = ax.plot(*empty, animated=self._blit, **style)
+        return line
+
     def _ensure_artists(self, drone_id: int) -> None:
         if (0, drone_id) in self.markers:
             return
         for index, ax in enumerate(self._axes()):
-            if ax is self.ax_top:
-                (trail,) = ax.plot([], [], linestyle="--", linewidth=1.0)
-                (marker,) = ax.plot([], [], marker="o", markersize=8, linestyle="")
-            else:
-                (trail,) = ax.plot([], [], [], linestyle="--", linewidth=1.0)
-                (marker,) = ax.plot([], [], [], marker="o", markersize=8, linestyle="")
-            self.trails[(index, drone_id)] = trail
-            self.markers[(index, drone_id)] = marker
+            self.trails[(index, drone_id)] = self._new_line(ax, linestyle="--", linewidth=1.0)
+            self.markers[(index, drone_id)] = self._new_line(ax, marker="o", markersize=8, linestyle="")
 
     # ------------------------------------------------------------------ drawing
     def _team(self, drone_id: int, state: dict[str, Any]) -> str:
@@ -244,23 +331,99 @@ class ArenaVisualizer:
             text = f"{hud['title']}\n{text}"
         self.hud_text.set_text(text)
         self.events_text.set_text("\n".join(hud.get("events", [])[-5:]))
-        for artist in self.hit_artists:
-            artist.remove()
-        self.hit_artists.clear()
-        for position in hud.get("hits", []):
-            east, north, up = ned_to_enu(tuple(position))
-            for ax in self._axes():
-                if ax is self.ax_top:
-                    (artist,) = ax.plot([east], [north], marker="x", color="black", markersize=14, mew=3)
-                else:
-                    (artist,) = ax.plot([east], [north], [up], marker="x", color="black", markersize=14, mew=3)
-                self.hit_artists.append(artist)
+        hits = [ned_to_enu(tuple(position)) for position in hud.get("hits", [])]
+        xs, ys, zs = ([p[i] for p in hits] for i in range(3))
+        for ax, line in zip(self._axes(), self.hit_lines):
+            if ax is self.ax_top:
+                line.set_data(xs, ys)
+            else:
+                line.set_data_3d(xs, ys, zs)
 
     def update_frame(self, drones_state: dict[Any, dict[str, Any]], hud: Optional[dict[str, Any]] = None) -> None:
-        """Draws one frame and lets the GUI breathe (``plt.pause``), as in the specification."""
+        """Draws one frame and lets the GUI process its events.
+
+        The specification asked for ``plt.pause(0.05)`` here; with Tk that redraws
+        the whole figure every time (see the module docstring), so the frame is
+        blitted and the GUI events are flushed instead.
+        """
+        started = time.perf_counter()
         self.render(drones_state, hud)
-        plt.pause(self.pause_s)
+        self.present()
+        drawn = time.perf_counter()
+        self.fig.canvas.flush_events()  # the GUI copies the image to the screen here
+        shown = time.perf_counter()
+        self._draw_ms = _smooth(self._draw_ms, 1000.0 * (drawn - started))
+        self._screen_ms = _smooth(self._screen_ms, 1000.0 * (shown - drawn))
         self.apply_window_layout()
+
+    def _draw_dynamic(self) -> None:
+        """Draws the animated artists over whatever is in the canvas buffer."""
+        axes = self._axes()
+        for (index, _), line in self.trails.items():
+            axes[index].draw_artist(line)
+        for (index, _), marker in self.markers.items():
+            axes[index].draw_artist(marker)
+        for ax, line in zip(axes, self.hit_lines):
+            ax.draw_artist(line)
+        for text in (self.hud_text, self.events_text, self.stats_text):
+            self.fig.draw_artist(text)
+
+    def _on_draw(self, event: Any) -> None:
+        """After every full redraw (first show, resize, mouse rotation) cache the static scene."""
+        if not self._blit:
+            return
+        if self.fig.canvas.is_saving():
+            # When saving (GIF export, toolbar "save") axes include their animated artists,
+            # but the figure leaves out its animated texts: draw them into the saved image.
+            for text in (self.hud_text, self.events_text, self.stats_text):
+                text.draw(event.renderer)
+            return
+        self.full_redraws += 1
+        self._background = self.fig.canvas.copy_from_bbox(self.fig.bbox)
+        self._draw_dynamic()
+
+    def present(self) -> None:
+        """Shows the current state: static background from the cache plus the moving artists."""
+        canvas = self.fig.canvas
+        if not self._blit:
+            canvas.draw_idle()
+        elif self._background is None:
+            canvas.draw()  # full redraw; _on_draw caches the background and draws the drones
+        else:
+            canvas.restore_region(self._background)
+            self._draw_dynamic()
+            canvas.blit(self.fig.bbox)
+
+    def idle(self, seconds: float) -> None:
+        """Keeps the window responsive for ``seconds`` without redrawing anything."""
+        self.fig.canvas.start_event_loop(seconds)
+        self.apply_window_layout()
+
+    def record_delay(self, sent_at: float) -> None:
+        """Shows how long frames take from the arena to the screen (bottom-right corner)."""
+        now = time.time()
+        delay = max(now - sent_at, 0.0)
+        self._max_delay = max(self._max_delay, delay)
+        self._delay = _smooth(self._delay, delay)
+        self._frame_times.append(now)
+        self.stats_text.set_text(self._stats_line())
+
+    def _fps(self) -> float:
+        if len(self._frame_times) < 2:
+            return 0.0
+        return (len(self._frame_times) - 1) / max(self._frame_times[-1] - self._frame_times[0], 1e-6)
+
+    def _stats_line(self) -> str:
+        """Delay and where the time goes: drawing (matplotlib) vs. copying to the screen (GUI, X server)."""
+        line = f"view delay {self._delay or 0.0:.2f} s | {self._fps():.0f} frames/s"
+        if self._draw_ms is not None and self._screen_ms is not None:
+            line += f" | draw {self._draw_ms:.0f} ms, screen {self._screen_ms:.0f} ms"
+        return line + f" | full redraws {self.full_redraws}"
+
+    def delay_summary(self) -> str:
+        if self._delay is None:
+            return "3D view: no frames"
+        return f"3D view: {self._stats_line()} (max delay {self._max_delay:.2f} s)"
 
     def is_open(self) -> bool:
         return plt.fignum_exists(self.fig.number)
@@ -296,8 +459,8 @@ def _visualizer_main(
         if visualizer is not None and visualizer.is_open():
             visualizer.close()
         fresh = ArenaVisualizer(config, window_layout=window_layout, title=window_title)
-        plt.pause(0.05)
-        fresh.apply_window_layout()
+        fresh.present()
+        fresh.idle(0.05)
         closed.clear()
         ready.set()
         return fresh
@@ -320,6 +483,7 @@ def _visualizer_main(
                 frozen = True
                 if visualizer.is_open():
                     visualizer.update_frame(command[1], command[2])
+                    print(visualizer.delay_summary(), flush=True)
             continue
         if not visualizer.is_open():
             closed.set()
@@ -328,11 +492,12 @@ def _visualizer_main(
         try:
             _, drones, hud = frames.get(timeout=0.005)
         except queue.Empty:
-            plt.pause(visualizer.pause_s)
-            visualizer.apply_window_layout()
+            visualizer.idle(0.02)
             continue
         if not frozen:
             visualizer.update_frame(drones, hud)
+            if "sent_at" in hud:
+                visualizer.record_delay(hud["sent_at"])
     if visualizer is not None and visualizer.is_open():
         visualizer.close()
 
@@ -369,7 +534,7 @@ class VisualizerProcess:
         return self.wait_ready(timeout)
 
     def publish(self, drones: dict[Any, Any], hud: dict[str, Any]) -> None:
-        item = ("frame", drones, hud)
+        item = ("frame", drones, {**hud, "sent_at": time.time()})
         try:
             self._frames.put_nowait(item)
         except queue.Full:

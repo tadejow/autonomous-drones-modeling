@@ -7,12 +7,12 @@
 origin_lat_deg = -35.36335
 origin_lon_deg = 149.16500
 ground_alt_amsl_m = 584.0
-attacker_start_north_m = 150.0   # attackers' row lies 150 m north of the base
-start_spacing_m = 5.0            # the specification proposes 2 m; 5 m keeps markers readable
+attacker_start_north_m = 200.0   # attackers' row lies 200 m north of the base
+start_spacing_m = 20.0           # the specification proposes 2 m; 20 m keeps map icons apart
 takeoff_alt_m = 15.0
 # Soft geofence (Safety Limiter).
 north_min_m = -40.0
-north_max_m = 210.0
+north_max_m = 260.0
 east_min_m = -60.0
 east_max_m = 60.0
 alt_min_m = 3.0
@@ -49,6 +49,7 @@ max_restarts = 3
 connection_mode = "udp"          # "udp": --out ports 14550..14600; "tcp": direct 5760..5810 (--no-mavproxy)
 udp_base_port = 14550
 map_udp_base_port = 14650
+map_events_port = 14800           # battle events (kills, explosions) for the MAVProxy map
 tcp_base_port = 5760
 port_step = 10
 connect_timeout_s = 60.0

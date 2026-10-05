@@ -57,6 +57,16 @@ python -m pipeline.drones_battle.arena_orchestrator --backend sitl   # okna 2 i 
 
 Po starcie widać tylko dwa okna, które razem wypełniają ekran: mapa MAVProxy na lewej połowie i okno z widokami 3D na prawej. Terminale symulatorów startują zminimalizowane na pasku zadań (`xfce4-terminal --minimize` lub `xterm -iconic`). Mapę ustawia `wmctrl` (`sudo apt install wmctrl`; bez niego mapa otworzy się w domyślnym miejscu), a okno 3D ustawia samo orkiestrator (`window_layout` w `arena_config.toml`).
 
+Orkiestrator najpierw otwiera okno 3D i dopiero gdy jest na ekranie, uzbraja drony. Start i odliczanie widać już w oknie 3D.
+
+**Wymagania maszyny (szacunek, nie pomiar):** 3 vs 3 na SITL to 6 procesów ArduCopter, 7 instancji MAVProxy (6 przy symulatorach + mapa z wxPython), orkiestrator z 6 połączeniami DroneKit, 2 procesy strategii i proces okna 3D, a do tego pulpit zdalny. Rozsądne minimum to **6 GB RAM i 4 vCPU**, płynnie: **8 GB i 4–6 vCPU**. Dla 5 vs 5 (10 symulatorów): **8 GB minimum, 12 GB płynnie, 6–8 vCPU**. Rzeczywiste zużycie w trakcie meczu sprawdzisz poleceniem `free -h` albo `ps -eo rss= | awk '{s+=$1} END {print s/1024 " MB"}'`.
+
+W prawym dolnym rogu okna 3D widać opóźnienie obrazu względem areny, liczbę klatek na sekundę, czas rysowania klatki (`draw`), czas przeniesienia jej na ekran (`screen`, czyli praca GUI i serwera X) oraz liczbę pełnych przerysowań. Okno rysuje tylko ruchome elementy na zapamiętanym tle (blitting), więc opóźnienie powinno wynosić około 0,05 s; wartości powyżej ok. 0,3 s oznaczają przeciążoną maszynę. Jeśli przeważa `screen`, wąskim gardłem jest pulpit zdalny, a nie Python. Po meczu na SITL orkiestrator ostrzega też, jeśli telemetria spóźniała się względem symulatorów o więcej niż 1 s (`telemetry_lag_max_s` w statystykach).
+
+Na mapie atakujący są czerwoni, a obrońcy niebiescy (jak w widokach 3D), z numerem SysID przy ikonie. Robi to mały moduł MAVProxy z tego repozytorium (`mavproxy_arena.py`), który też dopasowuje widok do wszystkich dronów, gdy tylko się pojawią. Jeśli przesuniesz albo przybliżysz mapę, wpisz w konsoli `arena-map` polecenie `arena center`, a widok wróci nad drony.
+
+Przy każdym zestrzeleniu orkiestrator wysyła do tego modułu krótką wiadomość UDP (port `map_events_port`, domyślnie 14800). Zestrzelone drony znikają z mapy, a w miejscu zderzenia pojawia się eksplozja z numerami zniszczonych dronów (np. `1+4` przy zderzeniu kamikaze). Po 3 s eksplozja zmienia się w mały, przygaszony znacznik, który zostaje do końca meczu. Na starcie kolejnego meczu wszystkie drony wracają, a stare eksplozje znikają.
+
 Terminal wybierany jest automatycznie (najpierw `xfce4-terminal`, potem `xterm`); można go wymusić przez `ARENA_TERMINAL=xterm`, a `ARENA_TERMINAL=none` uruchamia symulatory bez okien (logi w `logs/`). Skrypt nigdy nie zabija terminali użytkownika (`stop_arena.sh` korzysta z pliku `.arena_pids`).
 
 ### Na komputerze w pracowni (zdalnie przez labgate)
@@ -88,7 +98,7 @@ python -m pipeline.drones_battle.replay <plik>.jsonl --save walka.gif --step 5
 
 ### Przykładowe walki
 
-Nagrane na backendzie kinematycznym (bez SITL) z drużynami z `teams/`, losowe przesunięcie startu do 3 m. Obok każdego GIF-a leży nagranie `.jsonl`, które można odtworzyć przez `replay`. GIF-y odtwarzane są w czasie rzeczywistym (co druga klatka, 5 kl./s).
+Nagrane na backendzie kinematycznym (bez SITL) z drużynami z `teams/`, losowe przesunięcie startu do 3 m, przy wcześniejszym ustawieniu areny (drużyny 150 m od siebie, drony co 5–6 m). Obok każdego GIF-a leży nagranie `.jsonl`, które można odtworzyć przez `replay`. GIF-y odtwarzane są w czasie rzeczywistym (co druga klatka, 5 kl./s).
 
 | Plik | Atak → obrona | Wynik | Co widać |
 |---|---|---|---|
@@ -139,7 +149,7 @@ python -m pipeline.drones_battle.arena_orchestrator --backend sitl --config pipe
 | `pincer` | zbiórka na okręgu wokół celu i jednoczesne uderzenie z wielu kierunków | obrona strefowa: posterunki na półokręgu + rezerwa przy bazie, ranking zagrożeń po czasie do celu |
 | `wolfpack` | „tarany” celowo zderzają się z obrońcami (kamikaze działa w obie strony), biegacze czekają na flankach | linia zaporowa, która wysyła obrońcę tylko do realnych zagrożeń (czas do celu < 14 s lub taran) |
 
-Turniej 5 vs 5 (6 rund na parę, 150 meczów): hunters 150 pkt, pincer 111, wolfpack 96, tricksters 75, baseline 18; atakujący wygrywają 39% meczów.
+Turniej 5 vs 5 (6 rund na parę, 150 meczów, drużyny 200 m od siebie, drony co 15 m): hunters 162 pkt, wolfpack 90, tricksters 90, pincer 90, baseline 18; atakujący wygrywają 35% meczów.
 
 ---
 
@@ -147,7 +157,7 @@ Turniej 5 vs 5 (6 rund na parę, 150 meczów): hunters 150 pkt, pincer 111, wolf
 
 | Zasada | Wartość domyślna |
 |---|---|
-| Drużyny | atakujący SysID 1, 2, 3 (północ), obrońcy SysID 4, 5, 6 (baza, południe), 150 m odstępu |
+| Drużyny | atakujący SysID 1, 2, 3 (północ), obrońcy SysID 4, 5, 6 (baza, południe), 200 m odstępu; drony w rzędzie co 20 m (5 vs 5: co 15 m) |
 | Cel atakujących | punkt 10 m nad bazą obrońców; wygrana, gdy żywy atakujący zbliży się na < 5 m |
 | Zestrzelenie | obrońcy to **drony kamikaze**: gdy obrońca zbliży się do atakującego na < 2 m, giną oba (tryb `LAND` lub swobodny spadek); jeden obrońca może zniszczyć tylko jednego atakującego |
 | Wygrana obrońców | wszyscy atakujący zestrzeleni albo minęło 120 s |
@@ -205,6 +215,7 @@ pipeline/drones_battle/
 ├── strategy_utils.py       # wektory, przechwycenie predykcyjne
 ├── tournament.py           # każdy z każdym, tabela, strojenie balansu
 ├── replay.py               # odtwarzanie z logu, eksport GIF/MP4
+├── mavproxy_arena.py       # moduł MAVProxy: kolory drużyn na mapie, dopasowanie widoku
 ├── start_arena.sh / stop_arena.sh / arena.parm / arena_config.toml
 ├── core/
 │   ├── config.py           # ArenaConfig (dataclasses) + wczytywanie TOML
@@ -266,14 +277,14 @@ Miękka ściana: jeśli `d` to odległość od ściany (dodatnia wewnątrz), sk�
 
 ## Balans
 
-Turniej z 10 rundami na parę (losowe przesunięcie startu do 3 m), przykładowe drużyny:
+Turniej z 10 rundami na parę (losowe przesunięcie startu do 3 m), wszystkie 5 przykładowych drużyn, drużyny 200 m od siebie, drony co 20 m:
 
 | Ustawienie | Wygrane atakujących |
 |---|---:|
-| domyślne: obrońcy kamikaze, 10 m/s obie strony | 41% (3 pierwsze drużyny), 33% (wszystkie 5) |
-| kamikaze, `defender_max_speed_mps = 9` | 44% |
-| obrońcy nieśmiertelni (`mutual_kill = false`), 10 m/s | 31% |
-| obrońcy nieśmiertelni, `defender_max_speed_mps = 9` | 42% |
+| domyślne: obrońcy kamikaze, 10 m/s obie strony | 28% |
+| kamikaze, `defender_max_speed_mps = 9` | 36% |
+
+Przy dawnym odstępie 150 m i trzech pierwszych drużynach domyślne zasady dawały 41%: większy dystans daje obrońcom więcej czasu na ustawienie się.
 
 Przy równych prędkościach obrońca stojący między atakującym a celem zawsze zdąży przechwycić (koło Apoloniusza degeneruje się do symetralnej). Reguła kamikaze równoważy to liczebnie: każdy obrońca może zatrzymać tylko jednego atakującego, więc gdy jeden obrońca chybi lub zostanie zwabiony, atak ma przewagę. Dalsze strojenie, np.:
 

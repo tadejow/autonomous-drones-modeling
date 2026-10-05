@@ -24,6 +24,7 @@ import numpy as np
 from pipeline.drones_battle.core import compat  # noqa: F401  (must precede dronekit)
 from pipeline.drones_battle.core.config import ArenaConfig, KillMode
 from pipeline.drones_battle.core.layout import DroneSlot, connection_string, drone_slots
+from pipeline.drones_battle.core.map_events import MapEvents
 from pipeline.drones_battle.core.types import RawState, Vec3
 from pipeline.math.geodesy import gps_to_ned, ned_to_gps
 
@@ -33,6 +34,8 @@ from pymavlink import mavutil  # noqa: E402
 VELOCITY_ONLY_MASK = 0b0000111111000111
 FORCE_DISARM_MAGIC = 21196
 GLOBAL_POSITION_INT_ID = 33
+MAX_EXTRAPOLATION_S = 0.3
+RATE_REQUEST_PERIOD_S = 1.0
 SLOT_TOLERANCE_M = 3.0
 
 
@@ -41,6 +44,7 @@ class _Telemetry:
     pos: np.ndarray
     vel: np.ndarray
     received_at: float
+    boot_s: float
 
 
 class SitlBackend:
@@ -52,8 +56,17 @@ class SitlBackend:
         self.slots: dict[int, DroneSlot] = {s.drone_id: s for s in drone_slots(config)}
         self.vehicles: dict[int, Vehicle] = {}
         self._telemetry: dict[int, _Telemetry] = {}
+        # Telemetry delay: receive time minus the autopilot's own clock (time_boot_ms). Its smallest
+        # value is the normal transport delay; growth above it means the simulator or this process
+        # (DroneKit decoding, CPU starved machine) falls behind real time.
+        self._clock_offset_min: dict[int, float] = {}
+        self._map_events = MapEvents(config.sitl.map_events_port)
+        self._telemetry_lag_max = 0.0
+        self._position_count: dict[int, int] = {}
+        self._duplicates = 0
         self._lock = threading.Lock()
         self._killed: set[int] = set()
+        self._rate_requested_at = 0.0
         self._t0 = time.monotonic()
 
     # ------------------------------------------------------------------ setup
@@ -73,24 +86,37 @@ class SitlBackend:
         address = connection_string(self.config, slot)
         print(f"  drone {slot.drone_id} ({slot.team}) -> {address}")
         vehicle = connect(address, wait_ready=True, timeout=self.config.sitl.connect_timeout_s)
-        vehicle.parameters["BATT_FS_LOW_ACT"] = 0
-        vehicle.parameters["BATT_FS_CRT_ACT"] = 0
-        vehicle.parameters["WPNAV_SPEED"] = 1500.0  # cm/s; commands are capped lower by the Safety Limiter
+        # BATT_FS_*, WPNAV_SPEED etc. come from arena.parm at SITL start; setting them here again
+        # timed out with six vehicles connecting at once ("timeout setting parameter WPNAV_SPEED").
         if self.config.sitl.wind_speed_mps > 0:
             vehicle.parameters["SIM_WIND_SPD"] = self.config.sitl.wind_speed_mps
             vehicle.parameters["SIM_WIND_DIR"] = self.config.sitl.wind_direction_deg
         self._request_position_rate(vehicle)
-        origin = self.config.arena.origin
         drone_id = slot.drone_id
 
         @vehicle.on_message("GLOBAL_POSITION_INT")
         def _on_position(_vehicle: Any, _name: str, message: Any) -> None:
-            pos = gps_to_ned(origin, message.lat * 1e-7, message.lon * 1e-7, message.alt * 1e-3)
-            vel = (message.vx * 0.01, message.vy * 0.01, message.vz * 0.01)
-            with self._lock:
-                self._telemetry[drone_id] = _Telemetry(np.array(pos), np.array(vel), time.monotonic())
+            self._store_position(drone_id, message)
 
         return vehicle
+
+    def _store_position(self, drone_id: int, message: Any, received: Optional[float] = None) -> None:
+        """Keeps the newest GLOBAL_POSITION_INT of a drone (called from DroneKit's reader thread)."""
+        pos = gps_to_ned(self.config.arena.origin, message.lat * 1e-7, message.lon * 1e-7, message.alt * 1e-3)
+        vel = (message.vx * 0.01, message.vy * 0.01, message.vz * 0.01)
+        received = time.monotonic() if received is None else received
+        boot_s = message.time_boot_ms * 1e-3
+        offset = received - boot_s
+        with self._lock:
+            previous = self._telemetry.get(drone_id)
+            if previous is not None and boot_s <= previous.boot_s:
+                self._duplicates += 1  # the same message twice (or out of order): ignore
+                return
+            self._telemetry[drone_id] = _Telemetry(np.array(pos), np.array(vel), received, boot_s)
+            self._position_count[drone_id] = self._position_count.get(drone_id, 0) + 1
+            baseline = min(self._clock_offset_min.get(drone_id, offset), offset)
+            self._clock_offset_min[drone_id] = baseline
+            self._telemetry_lag_max = max(self._telemetry_lag_max, offset - baseline)
 
     def _request_position_rate(self, vehicle: Vehicle) -> None:
         interval_us = 1e6 / self.config.sitl.position_rate_hz
@@ -135,8 +161,8 @@ class SitlBackend:
         vehicle.simple_takeoff(altitude_m)
 
     # ------------------------------------------------------------------ battle
-    def read_states(self) -> dict[int, RawState]:
-        now = time.monotonic()
+    def read_states(self, now: Optional[float] = None) -> dict[int, RawState]:
+        now = time.monotonic() if now is None else now
         stale_after = self.config.sitl.stale_after_s
         states: dict[int, RawState] = {}
         with self._lock:
@@ -145,8 +171,13 @@ class SitlBackend:
                 if telemetry is None:
                     states[drone_id] = RawState(np.array(slot.start_ned, dtype=float), np.zeros(3), stale=True)
                     continue
+                # Each drone reports at its own moments (10 Hz, different phases): bring every
+                # position to "now" with its velocity, so the referee compares the drones at the
+                # same instant. At 20 m/s closing speed 50 ms of misalignment is already 1 m.
+                age = now - telemetry.received_at
+                ahead = min(max(age, 0.0), MAX_EXTRAPOLATION_S)
                 states[drone_id] = RawState(
-                    telemetry.pos.copy(), telemetry.vel.copy(), stale=now - telemetry.received_at > stale_after
+                    telemetry.pos + telemetry.vel * ahead, telemetry.vel.copy(), stale=age > stale_after
                 )
         return states
 
@@ -173,11 +204,42 @@ class SitlBackend:
         else:
             vehicle.mode = VehicleMode("LAND")
 
+    def report_hit(self, victim: int, by: Optional[int], position_ned: Optional[Vec3]) -> None:
+        """Tells the MAVProxy map where a drone was destroyed (explosion icon)."""
+        if position_ned is None:
+            position_ned = tuple(self.read_states()[victim].pos)  # type: ignore[assignment]
+        lat, lon, _ = ned_to_gps(self.config.arena.origin, *position_ned)
+        self._map_events.kill(victim, by, lat, lon)
+
     def step(self, dt: float) -> None:
-        pass
+        # MAVProxy re-requests all streams at its 4 Hz every few seconds, which resets our
+        # 10 Hz GLOBAL_POSITION_INT; asking again every second keeps the positions at 10 Hz.
+        now = time.monotonic()
+        if now - self._rate_requested_at >= RATE_REQUEST_PERIOD_S:
+            self._rate_requested_at = now
+            for vehicle in self.vehicles.values():
+                self._request_position_rate(vehicle)
 
     def start_clock(self) -> None:
+        self._rate_requested_at = 0.0  # ask for the position rate in the first tick
         self._t0 = time.monotonic()
+        self._map_events.start()
+        with self._lock:
+            self._telemetry_lag_max = 0.0
+            self._position_count = {}
+            self._duplicates = 0
+
+    def diagnostics(self) -> dict[str, float]:
+        """Telemetry quality since the battle started: delay, position rate per drone, duplicates."""
+        elapsed = max(self.now(), 1e-6)
+        with self._lock:
+            rates = [self._position_count.get(i, 0) / elapsed for i in self.slots]
+            return {
+                "telemetry_lag_max_s": round(self._telemetry_lag_max, 3),
+                "position_rate_min_hz": round(min(rates), 1),
+                "position_rate_max_hz": round(max(rates), 1),
+                "duplicate_messages": self._duplicates,
+            }
 
     def now(self) -> float:
         return time.monotonic() - self._t0
