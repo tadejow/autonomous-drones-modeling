@@ -14,7 +14,7 @@ from __future__ import annotations
 import argparse
 from typing import Any, Optional
 
-from pipeline.drones_battle.arena_visualizer import ArenaVisualizer, plt
+from pipeline.drones_battle.arena_visualizer import ArenaVisualizer
 from pipeline.drones_battle.core.config import ArenaConfig
 from pipeline.drones_battle.core.recorder import read_recording
 from pipeline.drones_battle.core.types import EventKind, GameEvent
@@ -89,6 +89,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         for past in frames[start:index]:
             visualizer.render(past["drones"])
         visualizer.render(frames[index]["drones"], huds[index])
+        visualizer.present()
 
     if args.save:
         from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
@@ -127,11 +128,13 @@ def main(argv: Optional[list[str]] = None) -> None:
         if state["playing"] and state["index"] < len(frames) - 1:
             state["index"] += 1
             visualizer.render(frames[state["index"]]["drones"], huds[state["index"]])
-            state["internal"] = True
-            slider.set_val(state["index"])
-            state["internal"] = False
-        plt.pause(1.0 / args.fps)
-        visualizer.apply_window_layout()
+            visualizer.present()
+            # Moving the slider redraws the whole figure, so only every 10th frame.
+            if state["index"] % 10 == 0 or state["index"] == len(frames) - 1:
+                state["internal"] = True
+                slider.set_val(state["index"])
+                state["internal"] = False
+        visualizer.idle(1.0 / args.fps)
 
 
 if __name__ == "__main__":

@@ -61,6 +61,8 @@ Orkiestrator najpierw otwiera okno 3D i dopiero gdy jest na ekranie, uzbraja dro
 
 **Wymagania maszyny (szacunek, nie pomiar):** 3 vs 3 na SITL to 6 procesów ArduCopter, 7 instancji MAVProxy (6 przy symulatorach + mapa z wxPython), orkiestrator z 6 połączeniami DroneKit, 2 procesy strategii i proces okna 3D, a do tego pulpit zdalny. Rozsądne minimum to **6 GB RAM i 4 vCPU**, płynnie: **8 GB i 4–6 vCPU**. Dla 5 vs 5 (10 symulatorów): **8 GB minimum, 12 GB płynnie, 6–8 vCPU**. Rzeczywiste zużycie w trakcie meczu sprawdzisz poleceniem `free -h` albo `ps -eo rss= | awk '{s+=$1} END {print s/1024 " MB"}'`.
 
+W prawym dolnym rogu okna 3D widać opóźnienie obrazu względem areny i liczbę klatek na sekundę. Okno rysuje tylko ruchome elementy na zapamiętanym tle (blitting), więc opóźnienie powinno wynosić około 0,05 s; wartości powyżej ok. 0,3 s oznaczają przeciążoną maszynę. Po meczu na SITL orkiestrator ostrzega też, jeśli telemetria spóźniała się względem symulatorów o więcej niż 1 s (`telemetry_lag_max_s` w statystykach).
+
 Na mapie atakujący są czerwoni, a obrońcy niebiescy (jak w widokach 3D), z numerem SysID przy ikonie. Robi to mały moduł MAVProxy z tego repozytorium (`mavproxy_arena.py`), który też dopasowuje widok do wszystkich dronów, gdy tylko się pojawią. Jeśli przesuniesz albo przybliżysz mapę, wpisz w konsoli `arena-map` polecenie `arena center`, a widok wróci nad drony.
 
 Terminal wybierany jest automatycznie (najpierw `xfce4-terminal`, potem `xterm`); można go wymusić przez `ARENA_TERMINAL=xterm`, a `ARENA_TERMINAL=none` uruchamia symulatory bez okien (logi w `logs/`). Skrypt nigdy nie zabija terminali użytkownika (`stop_arena.sh` korzysta z pliku `.arena_pids`).

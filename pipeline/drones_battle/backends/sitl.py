@@ -52,6 +52,11 @@ class SitlBackend:
         self.slots: dict[int, DroneSlot] = {s.drone_id: s for s in drone_slots(config)}
         self.vehicles: dict[int, Vehicle] = {}
         self._telemetry: dict[int, _Telemetry] = {}
+        # Telemetry delay: receive time minus the autopilot's own clock (time_boot_ms). Its smallest
+        # value is the normal transport delay; growth above it means the simulator or this process
+        # (DroneKit decoding, CPU starved machine) falls behind real time.
+        self._clock_offset_min: dict[int, float] = {}
+        self._telemetry_lag_max = 0.0
         self._lock = threading.Lock()
         self._killed: set[int] = set()
         self._t0 = time.monotonic()
@@ -86,8 +91,13 @@ class SitlBackend:
         def _on_position(_vehicle: Any, _name: str, message: Any) -> None:
             pos = gps_to_ned(origin, message.lat * 1e-7, message.lon * 1e-7, message.alt * 1e-3)
             vel = (message.vx * 0.01, message.vy * 0.01, message.vz * 0.01)
+            received = time.monotonic()
+            offset = received - message.time_boot_ms * 1e-3
             with self._lock:
-                self._telemetry[drone_id] = _Telemetry(np.array(pos), np.array(vel), time.monotonic())
+                self._telemetry[drone_id] = _Telemetry(np.array(pos), np.array(vel), received)
+                baseline = min(self._clock_offset_min.get(drone_id, offset), offset)
+                self._clock_offset_min[drone_id] = baseline
+                self._telemetry_lag_max = max(self._telemetry_lag_max, offset - baseline)
 
         return vehicle
 
@@ -177,6 +187,13 @@ class SitlBackend:
 
     def start_clock(self) -> None:
         self._t0 = time.monotonic()
+        with self._lock:
+            self._telemetry_lag_max = 0.0
+
+    def diagnostics(self) -> dict[str, float]:
+        """Largest telemetry delay (s) beyond the normal one since the battle started."""
+        with self._lock:
+            return {"telemetry_lag_max_s": round(self._telemetry_lag_max, 3)}
 
     def now(self) -> float:
         return time.monotonic() - self._t0

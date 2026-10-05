@@ -215,6 +215,13 @@ class Match:
             "defenders": self.defenders.stats(),
             "loop": clock.stats(),
         }
+        diagnostics = getattr(self.backend, "diagnostics", None)
+        if diagnostics is not None:
+            result.stats["telemetry"] = diagnostics()
+            lag = result.stats["telemetry"].get("telemetry_lag_max_s", 0.0)
+            if lag > 1.0:
+                self._log(f"WARNING: telemetry fell up to {lag:.1f} s behind the simulators "
+                          "(machine overloaded? see README: hardware)")
         self.recorder.write_result(result.as_dict())
         banner = f"{result.winner.upper()} WIN ({result.reason.value}, t = {result.time:.1f} s)"
         self._log(banner)

@@ -8,6 +8,12 @@
   matches the MAVProxy map; plotting (N, E, Up) would mirror the scene.
 * Artists are created once and only updated, which is much faster than
   ``ax.clear()`` and keeps the camera still.
+* Blitting: the static scene (panes, grid, ticks, target spheres) is drawn
+  once and cached as a bitmap; each frame restores it and draws only the
+  drones, trails and texts. A full redraw of two 3D axes takes 0.2-1 s,
+  which made the view lag behind the MAVProxy map. For the same reason the
+  window loop never calls ``plt.pause``: on Tk every ``plt.pause`` calls
+  ``show()``, which re-renders the whole figure and raises the window.
 
 ``VisualizerProcess`` runs the visualizer in its own process, so drawing can
 never slow down the 10 Hz control loop of the orchestrator.
@@ -40,6 +46,9 @@ from pipeline.math.geodesy import ned_to_enu  # noqa: E402
 
 TEAM_COLORS = {"attackers": "red", "defenders": "blue"}
 TITLE_BAR_PX = 32
+DELAY_SMOOTHING = 0.2
+
+matplotlib.rcParams["figure.raise_window"] = False  # do not pull the window to the front on every update
 LAYOUT_RETRIES_S = (0.0, 1.0, 3.0)
 DEAD_COLOR = "gray"
 
@@ -141,11 +150,22 @@ class ArenaVisualizer:
         if self.ax_top is not None:
             self._setup_top(self.ax_top)
 
-        self.hud_text = self.fig.suptitle("", fontsize=14, fontweight="bold")
-        self.events_text = self.fig.text(0.01, 0.005, "", fontsize=9, family="monospace", va="bottom")
+        # Animated artists are left out of normal redraws and drawn by present() (blitting).
+        self._blit = bool(getattr(self.fig.canvas, "supports_blit", False))
+        self._background: Any = None
+        self.hud_text = self.fig.suptitle("", fontsize=14, fontweight="bold", animated=self._blit)
+        self.events_text = self.fig.text(0.01, 0.005, "", fontsize=9, family="monospace", va="bottom",
+                                         animated=self._blit)
+        self.stats_text = self.fig.text(0.99, 0.005, "", fontsize=8, color="#777777", ha="right", va="bottom",
+                                        animated=self._blit)
         self.trails: dict[tuple[int, int], Any] = {}
         self.markers: dict[tuple[int, int], Any] = {}
-        self.hit_artists: list[Any] = []
+        self.hit_lines = [self._new_line(ax, marker="x", color="black", markersize=14, mew=3, linestyle="")
+                          for ax in self._axes()]
+        self._delay: Optional[float] = None
+        self._max_delay = 0.0
+        self._frame_times: deque[float] = deque(maxlen=20)
+        self.fig.canvas.mpl_connect("draw_event", self._on_draw)
         self._layout_retries = list(LAYOUT_RETRIES_S)
         self._mapped_at: Optional[float] = None
 
@@ -248,18 +268,18 @@ class ArenaVisualizer:
     def _axes(self) -> list[Any]:
         return [ax for ax in (self.ax_def, self.ax_att, self.ax_top) if ax is not None]
 
+    def _new_line(self, ax: Any, **style: Any) -> Any:
+        """An empty (animated, when blitting) line in a 2D or 3D axes."""
+        empty: list[list[float]] = [[], []] if ax is self.ax_top else [[], [], []]
+        (line,) = ax.plot(*empty, animated=self._blit, **style)
+        return line
+
     def _ensure_artists(self, drone_id: int) -> None:
         if (0, drone_id) in self.markers:
             return
         for index, ax in enumerate(self._axes()):
-            if ax is self.ax_top:
-                (trail,) = ax.plot([], [], linestyle="--", linewidth=1.0)
-                (marker,) = ax.plot([], [], marker="o", markersize=8, linestyle="")
-            else:
-                (trail,) = ax.plot([], [], [], linestyle="--", linewidth=1.0)
-                (marker,) = ax.plot([], [], [], marker="o", markersize=8, linestyle="")
-            self.trails[(index, drone_id)] = trail
-            self.markers[(index, drone_id)] = marker
+            self.trails[(index, drone_id)] = self._new_line(ax, linestyle="--", linewidth=1.0)
+            self.markers[(index, drone_id)] = self._new_line(ax, marker="o", markersize=8, linestyle="")
 
     # ------------------------------------------------------------------ drawing
     def _team(self, drone_id: int, state: dict[str, Any]) -> str:
@@ -303,23 +323,84 @@ class ArenaVisualizer:
             text = f"{hud['title']}\n{text}"
         self.hud_text.set_text(text)
         self.events_text.set_text("\n".join(hud.get("events", [])[-5:]))
-        for artist in self.hit_artists:
-            artist.remove()
-        self.hit_artists.clear()
-        for position in hud.get("hits", []):
-            east, north, up = ned_to_enu(tuple(position))
-            for ax in self._axes():
-                if ax is self.ax_top:
-                    (artist,) = ax.plot([east], [north], marker="x", color="black", markersize=14, mew=3)
-                else:
-                    (artist,) = ax.plot([east], [north], [up], marker="x", color="black", markersize=14, mew=3)
-                self.hit_artists.append(artist)
+        hits = [ned_to_enu(tuple(position)) for position in hud.get("hits", [])]
+        xs, ys, zs = ([p[i] for p in hits] for i in range(3))
+        for ax, line in zip(self._axes(), self.hit_lines):
+            if ax is self.ax_top:
+                line.set_data(xs, ys)
+            else:
+                line.set_data_3d(xs, ys, zs)
 
     def update_frame(self, drones_state: dict[Any, dict[str, Any]], hud: Optional[dict[str, Any]] = None) -> None:
-        """Draws one frame and lets the GUI breathe (``plt.pause``), as in the specification."""
+        """Draws one frame and lets the GUI process its events.
+
+        The specification asked for ``plt.pause(0.05)`` here; with Tk that redraws
+        the whole figure every time (see the module docstring), so the frame is
+        blitted and the GUI events are flushed instead.
+        """
         self.render(drones_state, hud)
-        plt.pause(self.pause_s)
+        self.present()
+        self.fig.canvas.flush_events()
         self.apply_window_layout()
+
+    def _draw_dynamic(self) -> None:
+        """Draws the animated artists over whatever is in the canvas buffer."""
+        axes = self._axes()
+        for (index, _), line in self.trails.items():
+            axes[index].draw_artist(line)
+        for (index, _), marker in self.markers.items():
+            axes[index].draw_artist(marker)
+        for ax, line in zip(axes, self.hit_lines):
+            ax.draw_artist(line)
+        for text in (self.hud_text, self.events_text, self.stats_text):
+            self.fig.draw_artist(text)
+
+    def _on_draw(self, event: Any) -> None:
+        """After every full redraw (first show, resize, mouse rotation) cache the static scene."""
+        if not self._blit:
+            return
+        if self.fig.canvas.is_saving():
+            # When saving (GIF export, toolbar "save") axes include their animated artists,
+            # but the figure leaves out its animated texts: draw them into the saved image.
+            for text in (self.hud_text, self.events_text, self.stats_text):
+                text.draw(event.renderer)
+            return
+        self._background = self.fig.canvas.copy_from_bbox(self.fig.bbox)
+        self._draw_dynamic()
+
+    def present(self) -> None:
+        """Shows the current state: static background from the cache plus the moving artists."""
+        canvas = self.fig.canvas
+        if not self._blit:
+            canvas.draw_idle()
+        elif self._background is None:
+            canvas.draw()  # full redraw; _on_draw caches the background and draws the drones
+        else:
+            canvas.restore_region(self._background)
+            self._draw_dynamic()
+            canvas.blit(self.fig.bbox)
+
+    def idle(self, seconds: float) -> None:
+        """Keeps the window responsive for ``seconds`` without redrawing anything."""
+        self.fig.canvas.start_event_loop(seconds)
+        self.apply_window_layout()
+
+    def record_delay(self, sent_at: float) -> None:
+        """Shows how long frames take from the arena to the screen (bottom-right corner)."""
+        now = time.time()
+        delay = max(now - sent_at, 0.0)
+        self._max_delay = max(self._max_delay, delay)
+        self._delay = delay if self._delay is None else (1 - DELAY_SMOOTHING) * self._delay + DELAY_SMOOTHING * delay
+        self._frame_times.append(now)
+        fps = 0.0
+        if len(self._frame_times) > 1:
+            fps = (len(self._frame_times) - 1) / max(self._frame_times[-1] - self._frame_times[0], 1e-6)
+        self.stats_text.set_text(f"view delay {self._delay:.2f} s  |  {fps:.0f} frames/s")
+
+    def delay_summary(self) -> str:
+        if self._delay is None:
+            return "3D view: no frames"
+        return f"3D view: delay {self._delay:.2f} s (max {self._max_delay:.2f} s)"
 
     def is_open(self) -> bool:
         return plt.fignum_exists(self.fig.number)
@@ -355,8 +436,8 @@ def _visualizer_main(
         if visualizer is not None and visualizer.is_open():
             visualizer.close()
         fresh = ArenaVisualizer(config, window_layout=window_layout, title=window_title)
-        plt.pause(0.05)
-        fresh.apply_window_layout()
+        fresh.present()
+        fresh.idle(0.05)
         closed.clear()
         ready.set()
         return fresh
@@ -379,6 +460,7 @@ def _visualizer_main(
                 frozen = True
                 if visualizer.is_open():
                     visualizer.update_frame(command[1], command[2])
+                    print(visualizer.delay_summary(), flush=True)
             continue
         if not visualizer.is_open():
             closed.set()
@@ -387,11 +469,12 @@ def _visualizer_main(
         try:
             _, drones, hud = frames.get(timeout=0.005)
         except queue.Empty:
-            plt.pause(visualizer.pause_s)
-            visualizer.apply_window_layout()
+            visualizer.idle(0.02)
             continue
         if not frozen:
             visualizer.update_frame(drones, hud)
+            if "sent_at" in hud:
+                visualizer.record_delay(hud["sent_at"])
     if visualizer is not None and visualizer.is_open():
         visualizer.close()
 
@@ -428,7 +511,7 @@ class VisualizerProcess:
         return self.wait_ready(timeout)
 
     def publish(self, drones: dict[Any, Any], hud: dict[str, Any]) -> None:
-        item = ("frame", drones, hud)
+        item = ("frame", drones, {**hud, "sent_at": time.time()})
         try:
             self._frames.put_nowait(item)
         except queue.Full:
