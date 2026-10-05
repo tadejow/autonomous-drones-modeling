@@ -103,7 +103,8 @@ launch() {  # $1 = name, $2 = command; terminal windows start minimized
 minimize_arena_terminals() {  # fallback for window managers that ignore --minimize / -iconic
     command -v xdotool >/dev/null 2>&1 || return 0
     local window
-    for window in $(xdotool search --name '^arena-' 2>/dev/null); do
+    # arena-* = our terminals, ArduCopter = the xterm that sim_vehicle.py opens for each simulator
+    for window in $(xdotool search --name '^(arena-|ArduCopter)' 2>/dev/null); do
         xdotool windowminimize "$window" 2>/dev/null || true
     done
 }
@@ -163,8 +164,9 @@ if [[ "${ARENA_NO_MAP:-0}" != "1" ]]; then
     echo "Waiting for the simulators before opening the map..."
     sleep "${ARENA_MAP_DELAY:-25}"
     # Centre on the middle of the arena, zoom to show both bases, do not follow one drone.
+    # (awk prints a newline: "read" fails at an unterminated line, which "set -e" turns into an exit)
     read -r map_lat map_lon < <(echo "$LAYOUT" | grep -v '^mode' |
-        awk '{ lat += $3; lon += $4; n++ } END { printf "%.7f %.7f", lat / n, lon / n }')
+        awk -v OFMT='%.7f' '{ lat += $3; lon += $4; n++ } END { print lat / n, lon / n }')
     map_cmds="map center $map_lat $map_lon; map zoom 350; map follow 0"
     launch "map" "${ACTIVATE}$MAVPROXY $MAP_MASTERS --map --cmd='$map_cmds'"
     place_map_window &
