@@ -8,7 +8,7 @@ origin_lat_deg = -35.36335
 origin_lon_deg = 149.16500
 ground_alt_amsl_m = 584.0
 attacker_start_north_m = 200.0   # attackers' row lies 200 m north of the base
-start_spacing_m = 12.0           # the specification proposes 2 m; 12 m keeps map icons apart
+start_spacing_m = 20.0           # the specification proposes 2 m; 20 m keeps map icons apart
 takeoff_alt_m = 15.0
 # Soft geofence (Safety Limiter).
 north_min_m = -40.0

@@ -6,7 +6,7 @@
 # SITL ports: orchestrator 14550..14640, map 14650..14740 (step 10 per drone).
 
 [arena]
-start_spacing_m = 10.0
+start_spacing_m = 15.0
 east_min_m = -80.0
 east_max_m = 80.0
 

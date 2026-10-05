@@ -168,10 +168,12 @@ if [[ "${ARENA_NO_MAP:-0}" != "1" ]]; then
     # so if it fails to load the map still shows the drones).
     map_teams="$(echo "$LAYOUT" | grep -v '^mode' |
         awk '{ printf "%s%s:%s", (NR > 1 ? "," : ""), $2, ($9 == "attackers" ? "red" : "blue") }')"
-    # The module opens the map itself (with a longer start-up limit than MAVProxy's 5 s);
-    # "module load map" only matters if the module fails to load.
-    map_cmds="module load pipeline.drones_battle.mavproxy_arena; module load map"
-    launch "map" "${ACTIVATE}export PYTHONPATH=$REPO_DIR ARENA_MAP_TEAMS=$map_teams && \
+    # The module opens the map itself (with a longer start-up limit than MAVProxy's 5 s).
+    # No extra "module load map": MAVProxy would open a second map window ("Map2").
+    map_cmds="module load pipeline.drones_battle.mavproxy_arena"
+    # Shape of the window that place_map_window gives the map (left half of the work area).
+    map_aspect="$(work_area | awk '{ printf "%.3f\n", ($3 / 2) / ($4 - 32) }')"
+    launch "map" "${ACTIVATE}export PYTHONPATH=$REPO_DIR ARENA_MAP_TEAMS=$map_teams ARENA_MAP_ASPECT=$map_aspect && \
         $MAVPROXY $MAP_MASTERS --cmd='$map_cmds'"
     place_map_window &
 fi

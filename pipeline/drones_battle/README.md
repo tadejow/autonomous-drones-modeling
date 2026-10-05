@@ -57,6 +57,10 @@ python -m pipeline.drones_battle.arena_orchestrator --backend sitl   # okna 2 i 
 
 Po starcie widać tylko dwa okna, które razem wypełniają ekran: mapa MAVProxy na lewej połowie i okno z widokami 3D na prawej. Terminale symulatorów startują zminimalizowane na pasku zadań (`xfce4-terminal --minimize` lub `xterm -iconic`). Mapę ustawia `wmctrl` (`sudo apt install wmctrl`; bez niego mapa otworzy się w domyślnym miejscu), a okno 3D ustawia samo orkiestrator (`window_layout` w `arena_config.toml`).
 
+Orkiestrator najpierw otwiera okno 3D i dopiero gdy jest na ekranie, uzbraja drony. Start i odliczanie widać już w oknie 3D.
+
+**Wymagania maszyny (szacunek, nie pomiar):** 3 vs 3 na SITL to 6 procesów ArduCopter, 7 instancji MAVProxy (6 przy symulatorach + mapa z wxPython), orkiestrator z 6 połączeniami DroneKit, 2 procesy strategii i proces okna 3D, a do tego pulpit zdalny. Rozsądne minimum to **6 GB RAM i 4 vCPU**, płynnie: **8 GB i 4–6 vCPU**. Dla 5 vs 5 (10 symulatorów): **8 GB minimum, 12 GB płynnie, 6–8 vCPU**. Rzeczywiste zużycie w trakcie meczu sprawdzisz poleceniem `free -h` albo `ps -eo rss= | awk '{s+=$1} END {print s/1024 " MB"}'`.
+
 Na mapie atakujący są czerwoni, a obrońcy niebiescy (jak w widokach 3D), z numerem SysID przy ikonie. Robi to mały moduł MAVProxy z tego repozytorium (`mavproxy_arena.py`), który też dopasowuje widok do wszystkich dronów, gdy tylko się pojawią. Jeśli przesuniesz albo przybliżysz mapę, wpisz w konsoli `arena-map` polecenie `arena center`, a widok wróci nad drony.
 
 Terminal wybierany jest automatycznie (najpierw `xfce4-terminal`, potem `xterm`); można go wymusić przez `ARENA_TERMINAL=xterm`, a `ARENA_TERMINAL=none` uruchamia symulatory bez okien (logi w `logs/`). Skrypt nigdy nie zabija terminali użytkownika (`stop_arena.sh` korzysta z pliku `.arena_pids`).
@@ -141,7 +145,7 @@ python -m pipeline.drones_battle.arena_orchestrator --backend sitl --config pipe
 | `pincer` | zbiórka na okręgu wokół celu i jednoczesne uderzenie z wielu kierunków | obrona strefowa: posterunki na półokręgu + rezerwa przy bazie, ranking zagrożeń po czasie do celu |
 | `wolfpack` | „tarany” celowo zderzają się z obrońcami (kamikaze działa w obie strony), biegacze czekają na flankach | linia zaporowa, która wysyła obrońcę tylko do realnych zagrożeń (czas do celu < 14 s lub taran) |
 
-Turniej 5 vs 5 (6 rund na parę, 150 meczów, drużyny 200 m od siebie): hunters 159 pkt, pincer 93, wolfpack 90, tricksters 90, baseline 18; atakujący wygrywają 34% meczów.
+Turniej 5 vs 5 (6 rund na parę, 150 meczów, drużyny 200 m od siebie, drony co 15 m): hunters 162 pkt, wolfpack 90, tricksters 90, pincer 90, baseline 18; atakujący wygrywają 35% meczów.
 
 ---
 
@@ -149,7 +153,7 @@ Turniej 5 vs 5 (6 rund na parę, 150 meczów, drużyny 200 m od siebie): hunters
 
 | Zasada | Wartość domyślna |
 |---|---|
-| Drużyny | atakujący SysID 1, 2, 3 (północ), obrońcy SysID 4, 5, 6 (baza, południe), 200 m odstępu; drony w rzędzie co 12 m |
+| Drużyny | atakujący SysID 1, 2, 3 (północ), obrońcy SysID 4, 5, 6 (baza, południe), 200 m odstępu; drony w rzędzie co 20 m (5 vs 5: co 15 m) |
 | Cel atakujących | punkt 10 m nad bazą obrońców; wygrana, gdy żywy atakujący zbliży się na < 5 m |
 | Zestrzelenie | obrońcy to **drony kamikaze**: gdy obrońca zbliży się do atakującego na < 2 m, giną oba (tryb `LAND` lub swobodny spadek); jeden obrońca może zniszczyć tylko jednego atakującego |
 | Wygrana obrońców | wszyscy atakujący zestrzeleni albo minęło 120 s |
@@ -269,14 +273,12 @@ Miękka ściana: jeśli `d` to odległość od ściany (dodatnia wewnątrz), sk�
 
 ## Balans
 
-Turniej z 10 rundami na parę (losowe przesunięcie startu do 3 m), wszystkie 5 przykładowych drużyn, drużyny 200 m od siebie:
+Turniej z 10 rundami na parę (losowe przesunięcie startu do 3 m), wszystkie 5 przykładowych drużyn, drużyny 200 m od siebie, drony co 20 m:
 
 | Ustawienie | Wygrane atakujących |
 |---|---:|
-| domyślne: obrońcy kamikaze, 10 m/s obie strony | 30% |
-| kamikaze, `defender_max_speed_mps = 9` | 37% |
-| kamikaze, `defender_max_speed_mps = 8.5` | 38% |
-| obrońcy nieśmiertelni (`mutual_kill = false`), 10 m/s | 32% |
+| domyślne: obrońcy kamikaze, 10 m/s obie strony | 28% |
+| kamikaze, `defender_max_speed_mps = 9` | 36% |
 
 Przy dawnym odstępie 150 m i trzech pierwszych drużynach domyślne zasady dawały 41%: większy dystans daje obrońcom więcej czasu na ustawienie się.
 

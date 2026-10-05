@@ -2,14 +2,14 @@
 
 ``start_arena.sh`` loads it into the combined map MAVProxy::
 
-    mavproxy.py --master=... --cmd="module load pipeline.drones_battle.mavproxy_arena; module load map"
+    mavproxy.py --master=... --cmd="module load pipeline.drones_battle.mavproxy_arena"
 
 * MAVProxy gives the map window only 5 s to start and otherwise fails with
   "map not ready", leaving an empty window that never shows a drone. On the
   lab machines that happened even with the simulators idle. This module
-  therefore loads the map itself, allowing ``MAP_START_TIMEOUT_S``. (The
-  ``module load map`` after it is a fallback that only runs if this module
-  failed to load.)
+  therefore loads the map itself, allowing ``MAP_START_TIMEOUT_S``. (No extra
+  ``module load map``: the map module may run several times, which opened a
+  second window, "Map2".)
 
 * The standard map draws every vehicle as the same red icon. Once loaded,
   this module hides those (map settings ``showahrspos``/``showgpspos``) and
@@ -17,9 +17,11 @@
   with the SysID. If the module cannot load, the standard icons stay.
 * It is a multi-vehicle module: MAVProxy passes other modules only the
   packets of its current target vehicle.
-* The view is fitted to the drones once all of them report a position, and
-  once more a few seconds later: the map keeps its top-left corner when
-  ``start_arena.sh`` resizes the window, which would otherwise shift the view.
+* The view is fitted to the drones once all of them report a position and
+  again a few times during the next ``FIT_DELAYS_S[-1]`` seconds: the map
+  keeps its top-left corner when ``start_arena.sh`` resizes the window, which
+  would otherwise shift the view. ``ARENA_MAP_ASPECT`` (window width / height,
+  from ``start_arena.sh``) makes the north-south extent fit as well.
 * ``arena center`` in the map console fits the view again at any time.
 
 Team colours come from ``ARENA_MAP_TEAMS`` (``"1:red,2:red,4:blue"``), set by
@@ -34,7 +36,7 @@ import time
 from MAVProxy.modules.lib import mp_module
 
 METRES_PER_DEGREE = 111320.0
-FIT_DELAYS_S = (2.0, 6.0)
+FIT_DELAYS_S = (2.0, 5.0, 8.0, 12.0, 16.0, 20.0)
 MAP_START_TIMEOUT_S = 60.0
 
 
@@ -63,20 +65,29 @@ def parse_teams(spec):
     return colours
 
 
-def fit(positions):
-    """Centre ``(lat, lon)`` and ground width (m) of a view showing all positions."""
+def fit(positions, aspect=4.0 / 3.0):
+    """Centre ``(lat, lon)`` and ground width (m) of a view showing all positions.
+
+    The map zoom is a ground *width*; ``aspect`` (window width / height) converts
+    the north-south extent into the width needed to show it.
+    """
     lats = [p[0] for p in positions]
     lons = [p[1] for p in positions]
     centre = ((min(lats) + max(lats)) / 2.0, (min(lons) + max(lons)) / 2.0)
     north_south = (max(lats) - min(lats)) * METRES_PER_DEGREE
     east_west = (max(lons) - min(lons)) * METRES_PER_DEGREE * math.cos(math.radians(centre[0]))
-    return centre, max(150.0, 1.5 * max(north_south, east_west) + 60.0)
+    needed = max(east_west, north_south * aspect)
+    return centre, max(150.0, 1.4 * needed + 80.0)
 
 
 class ArenaMapModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(ArenaMapModule, self).__init__(mpstate, "arena", "drone battle arena map", multi_vehicle=True)
         self.colours = parse_teams(os.environ.get("ARENA_MAP_TEAMS", ""))
+        try:
+            self.aspect = float(os.environ.get("ARENA_MAP_ASPECT", "") or 4.0 / 3.0)
+        except ValueError:
+            self.aspect = 4.0 / 3.0
         self.positions = {}
         self.icons = set()
         self.all_seen_at = None
@@ -160,7 +171,7 @@ class ArenaMapModule(mp_module.MPModule):
         slipmap = self._slipmap()
         if slipmap is None or not self.positions:
             return
-        (lat, lon), ground_width = fit(list(self.positions.values()))
+        (lat, lon), ground_width = fit(list(self.positions.values()), self.aspect)
         # Zoom first: changing the zoom moves the view around its top-left corner.
         slipmap.set_zoom(ground_width)
         slipmap.set_center(lat, lon)

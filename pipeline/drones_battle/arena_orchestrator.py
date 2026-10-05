@@ -289,12 +289,22 @@ def run_match(
         else:
             attackers = controller("attackers", attacker_ref, config.game.attacker_ids)
             defenders = controller("defenders", defender_ref, config.game.defender_ids)
+        # The 3D window opens first, so nothing flies before every window is on screen.
+        if owns_visualizer:
+            from pipeline.drones_battle.arena_visualizer import VisualizerProcess
+
+            if verbose:
+                print("Opening the 3D window...")
+            visualizer = VisualizerProcess(config, window_layout=window_layout_for(config, backend_name), title=title)
+            visualizer.wait_ready()
+        elif visualizer is not None:
+            visualizer.new_match(title)
         if verbose:
             print(f"Backend: {backend_name}. Connecting...")
         backend.connect()
         if start_jitter_m > 0 and hasattr(backend, "perturb_start"):
             backend.perturb_start(start_jitter_m)
-        backend.takeoff_all(config.arena.takeoff_alt_m)
+        _takeoff_with_preview(backend, config, visualizer, title)
         recorder.write_header({
             "created": datetime.now().isoformat(timespec="seconds"),
             "backend": backend_name,
@@ -304,19 +314,13 @@ def run_match(
             "seed": seed,
             "config": config.as_dict(),
         })
-        if owns_visualizer:
-            from pipeline.drones_battle.arena_visualizer import VisualizerProcess
-
-            visualizer = VisualizerProcess(config, window_layout=window_layout_for(config, backend_name), title=title)
-            visualizer.wait_ready()
-        elif visualizer is not None:
-            visualizer.new_match(title)
         if not getattr(backend, "simulated_time", False):  # SITL: give the pilots a moment
             for remaining in range(int(config.game.countdown_s), 0, -1):
                 if cancel is not None and cancel.is_set():
                     raise MatchCancelled()
                 if verbose:
                     print(f"Battle starts in {remaining}...")
+                _publish_preview(visualizer, backend, config, title, f"START IN {remaining}")
                 time.sleep(1.0)
         if verbose:
             print("FIGHT!")
@@ -344,6 +348,45 @@ def run_match(
             recorder.close()
             if owns_visualizer and visualizer is not None:
                 visualizer.close()
+
+
+def _publish_preview(visualizer: Optional[Any], backend: PhysicsBackend, config: ArenaConfig, title: str,
+                     banner: str) -> None:
+    """Shows the drones before the battle (take-off, countdown) in the 3D window."""
+    if visualizer is None:
+        return
+    states = backend.read_states()
+    drones = {i: {"pos": to_vec3(s.pos), "alive": True, "team": config.team_of(i)} for i, s in states.items()}
+    game = config.game
+    visualizer.publish(drones, {
+        "title": title, "banner": banner, "time": 0.0, "max_time": game.max_time_s,
+        "alive": {"attackers": len(game.attacker_ids), "defenders": len(game.defender_ids)},
+    })
+
+
+def _takeoff_with_preview(backend: PhysicsBackend, config: ArenaConfig, visualizer: Optional[Any],
+                          title: str) -> None:
+    """Runs the (blocking) take-off while the 3D window shows the drones climbing."""
+    if visualizer is None:
+        backend.takeoff_all(config.arena.takeoff_alt_m)
+        return
+    errors: list[BaseException] = []
+    done = threading.Event()
+
+    def take_off() -> None:
+        try:
+            backend.takeoff_all(config.arena.takeoff_alt_m)
+        except BaseException as exc:  # noqa: BLE001 - re-raised in the calling thread
+            errors.append(exc)
+        finally:
+            done.set()
+
+    threading.Thread(target=take_off, name="takeoff", daemon=True).start()
+    while not done.wait(0.3):
+        _publish_preview(visualizer, backend, config, title, "TAKE-OFF")
+    if errors:
+        raise errors[0]
+    _publish_preview(visualizer, backend, config, title, "READY")
 
 
 def _short(ref: str) -> str:

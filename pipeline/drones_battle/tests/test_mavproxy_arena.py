@@ -147,7 +147,10 @@ def test_team_colours_and_view_fit(arena_module, monkeypatch: pytest.MonkeyPatch
     assert [c[0] for c in fits] == ["zoom", "center"] * len(arena_module.FIT_DELAYS_S)
     _, lat, lon = fits[1]
     assert lat == pytest.approx(-35.36245) and lon == pytest.approx(149.1653)
-    assert fits[0][1] > 200 * 1.5  # 200 m between the teams fits into the view
+    assert fits[0][1] > 200 * 4 / 3  # 200 m between the teams fits into a 4:3 window
+
+    wide, tall = (arena_module.fit([(0.0, 0.0), (0.0018, 0.0)], aspect) for aspect in (2.0, 0.5))
+    assert wide[1] > tall[1]  # a wide window needs a larger ground width to show the same north-south span
 
     module.commands["arena"](["center"])
     assert slipmap.calls[-1][0] == "center"
