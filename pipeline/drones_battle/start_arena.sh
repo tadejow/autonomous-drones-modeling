@@ -16,7 +16,10 @@
 #   ARENA_TERMINAL  auto (default: xfce4-terminal, else xterm), xfce4-terminal, xterm,
 #                   or none / "" (no terminal windows, logs in logs/)
 #   ARDUPILOT_DIR   default ~/ardupilot
-#   PYTHON          default python3
+#   PYTHON          default python3 (only reads the arena configuration)
+#   ARDUPILOT_VENV  Python environment for sim_vehicle.py and MAVProxy, default ~/venv-ardupilot
+#                   when it exists (the one from ArduPilot's install script, it has wxPython
+#                   for the map); otherwise the current python3 is used
 #   ARENA_NO_MAP=1  skip the MAVProxy map
 #   ARENA_CONFIG    configuration file (default arena_config.toml), e.g. arena_config_5v5.toml;
 #                   pass the same file to the orchestrator with --config
@@ -27,6 +30,16 @@ REPO_DIR="$(cd "$ARENA_DIR/../.." && pwd)"
 ARDUPILOT_DIR="${ARDUPILOT_DIR:-$HOME/ardupilot}"
 SIM="$ARDUPILOT_DIR/Tools/autotest/sim_vehicle.py"
 PYTHON="${PYTHON:-python3}"
+ARDUPILOT_VENV="${ARDUPILOT_VENV:-$HOME/venv-ardupilot}"
+if [[ -f "$ARDUPILOT_VENV/bin/activate" ]]; then
+    SIM_PYTHON="$ARDUPILOT_VENV/bin/python3"
+    ACTIVATE="source $ARDUPILOT_VENV/bin/activate && "
+    MAVPROXY="$ARDUPILOT_VENV/bin/mavproxy.py"
+else
+    SIM_PYTHON="$(command -v python3)"
+    ACTIVATE=""
+    MAVPROXY="$(command -v mavproxy.py || echo mavproxy.py)"
+fi
 PIDFILE="$ARENA_DIR/.arena_pids"
 LOG_DIR="$ARENA_DIR/logs"
 TERMINAL="${ARENA_TERMINAL-auto}"
@@ -38,12 +51,19 @@ if ! ls "$ARDUPILOT_DIR"/build/sitl/bin/arducopter >/dev/null 2>&1; then
     echo "ERROR: ArduCopter SITL is not built. Run once: cd $ARDUPILOT_DIR && ./waf configure --board sitl && ./waf copter"
     exit 1
 fi
-missing="$("$PYTHON" -c 'import importlib.util as u; print(" ".join(m for m in ("pexpect", "MAVProxy") if u.find_spec(m) is None))' 2>/dev/null || echo "?")"
-if [[ -n "$missing" ]] || ! command -v mavproxy.py >/dev/null 2>&1; then
-    echo "ERROR: sim_vehicle.py and MAVProxy run with '$("$PYTHON" -c 'import sys; print(sys.executable)' 2>/dev/null || echo "$PYTHON")',"
-    echo "       which is missing: ${missing:-mavproxy.py on PATH}. Install them into this environment:"
-    echo "         pip install -r $REPO_DIR/requirements-sitl.txt"
+echo "sim_vehicle.py and MAVProxy use: $SIM_PYTHON"
+missing="$("$SIM_PYTHON" -c 'import importlib.util as u; print(" ".join(m for m in ("pexpect", "MAVProxy") if u.find_spec(m) is None))' 2>/dev/null || echo "?")"
+if [[ -n "$missing" ]] || ! [[ -x "$MAVPROXY" ]]; then
+    echo "ERROR: that Python is missing: ${missing:-mavproxy.py}. Install it there:"
+    echo "         $SIM_PYTHON -m pip install pexpect MAVProxy"
     exit 1
+fi
+if [[ "${ARENA_NO_MAP:-0}" != "1" ]] && ! "$SIM_PYTHON" -c "import wx" >/dev/null 2>&1; then
+    echo "WARNING: no wxPython in $SIM_PYTHON, so the MAVProxy map cannot open. Either"
+    echo "           sudo apt install python3-wxgtk4.0      (system Python), or"
+    echo "           $SIM_PYTHON -m pip install wxPython   (long build), or"
+    echo "         use the top-down map of the 3D window: arena_orchestrator ... --topdown"
+    ARENA_NO_MAP=1
 fi
 if [[ "$TERMINAL" == "auto" ]]; then
     TERMINAL=none
@@ -129,7 +149,7 @@ while read -r instance sysid lat lon alt heading port map_port team; do
         MAP_MASTERS+=" --master=udp:127.0.0.1:$map_port"
     fi
     echo "  SysID $sysid ($team): $lat, $lon, heading $heading -> port $port"
-    launch "sitl_$sysid" "cd $ARDUPILOT_DIR/ArduCopter && $SIM -v ArduCopter --no-rebuild -f quad \
+    launch "sitl_$sysid" "${ACTIVATE}cd $ARDUPILOT_DIR/ArduCopter && $SIM -v ArduCopter --no-rebuild -f quad \
         -I$instance --sysid $sysid -l $lat,$lon,$alt,$heading \
         --add-param-file=$ARENA_DIR/arena.parm $outputs"
     sleep 1
@@ -139,7 +159,7 @@ done < <(echo "$LAYOUT" | grep -v '^mode')
 if [[ "${ARENA_NO_MAP:-0}" != "1" ]]; then
     echo "Waiting for the simulators before opening the map..."
     sleep 10
-    launch "map" "mavproxy.py $MAP_MASTERS --map"
+    launch "map" "${ACTIVATE}$MAVPROXY $MAP_MASTERS --map"
     place_map_window &
 fi
 minimize_arena_terminals
@@ -147,5 +167,5 @@ minimize_arena_terminals
 echo
 echo "Arena is starting (simulator terminals are minimized in the taskbar)."
 echo "When all drones are visible on the map, run (from $REPO_DIR):"
-echo "  $PYTHON -m pipeline.drones_battle.arena_orchestrator --backend sitl ${ARENA_CONFIG:+--config $ARENA_CONFIG}"
+echo "  $PYTHON -m pipeline.drones_battle.arena_orchestrator --backend sitl ${ARENA_CONFIG:+--config $ARENA_CONFIG}$([[ "${ARENA_NO_MAP:-0}" == "1" ]] && echo " --topdown")"
 echo "Stop everything with: $ARENA_DIR/stop_arena.sh"

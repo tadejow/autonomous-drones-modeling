@@ -68,6 +68,9 @@ cd ~/autonomous-drones-modeling && git checkout main && git pull
 source venv/bin/activate          # pierwszy raz: python3 -m venv venv
 pip install -r requirements-sitl.txt   # dronekit itd. + pexpect i MAVProxy dla sim_vehicle.py
 pip install tomli                 # tylko dla Pythona < 3.11
+# Symulatory i mapa MAVProxy startują w ~/venv-ardupilot (środowisko z instalatora ArduPilota,
+# ma wxPython potrzebny mapie), jeśli istnieje; inne miejsce: ARDUPILOT_VENV=/ścieżka.
+# Bez wxPython skrypt pomija mapę i podpowiada --topdown (mapa z góry w oknie 3D).
 ./pipeline/drones_battle/start_arena.sh
 python -m pipeline.drones_battle.arena_orchestrator --backend sitl
 ```
