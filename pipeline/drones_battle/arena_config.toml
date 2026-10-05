@@ -49,6 +49,7 @@ max_restarts = 3
 connection_mode = "udp"          # "udp": --out ports 14550..14600; "tcp": direct 5760..5810 (--no-mavproxy)
 udp_base_port = 14550
 map_udp_base_port = 14650
+map_events_port = 14800           # battle events (kills, explosions) for the MAVProxy map
 tcp_base_port = 5760
 port_step = 10
 connect_timeout_s = 60.0

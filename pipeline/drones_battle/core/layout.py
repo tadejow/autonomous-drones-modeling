@@ -4,6 +4,7 @@ Run as a script to print one line per drone for the shell launcher::
 
     python3 -m pipeline.drones_battle.core.layout [--config arena_config.toml]
     # mode udp|tcp
+    # events <port of the map's battle events>
     # instance sysid lat lon alt_amsl heading orchestrator_port map_port team
 """
 
@@ -54,6 +55,7 @@ def main() -> None:
     config = load_config(parser.parse_args().config)
     sitl = config.sitl
     print(f"mode {sitl.connection_mode}")
+    print(f"events {sitl.map_events_port}")
     for slot in drone_slots(config):
         lat, lon, alt = ned_to_gps(config.arena.origin, *slot.start_ned)
         if sitl.connection_mode == "tcp":

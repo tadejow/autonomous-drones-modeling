@@ -24,6 +24,7 @@ import numpy as np
 from pipeline.drones_battle.core import compat  # noqa: F401  (must precede dronekit)
 from pipeline.drones_battle.core.config import ArenaConfig, KillMode
 from pipeline.drones_battle.core.layout import DroneSlot, connection_string, drone_slots
+from pipeline.drones_battle.core.map_events import MapEvents
 from pipeline.drones_battle.core.types import RawState, Vec3
 from pipeline.math.geodesy import gps_to_ned, ned_to_gps
 
@@ -56,6 +57,7 @@ class SitlBackend:
         # value is the normal transport delay; growth above it means the simulator or this process
         # (DroneKit decoding, CPU starved machine) falls behind real time.
         self._clock_offset_min: dict[int, float] = {}
+        self._map_events = MapEvents(config.sitl.map_events_port)
         self._telemetry_lag_max = 0.0
         self._lock = threading.Lock()
         self._killed: set[int] = set()
@@ -182,11 +184,19 @@ class SitlBackend:
         else:
             vehicle.mode = VehicleMode("LAND")
 
+    def report_hit(self, victim: int, by: Optional[int], position_ned: Optional[Vec3]) -> None:
+        """Tells the MAVProxy map where a drone was destroyed (explosion icon)."""
+        if position_ned is None:
+            position_ned = tuple(self.read_states()[victim].pos)  # type: ignore[assignment]
+        lat, lon, _ = ned_to_gps(self.config.arena.origin, *position_ned)
+        self._map_events.kill(victim, by, lat, lon)
+
     def step(self, dt: float) -> None:
         pass
 
     def start_clock(self) -> None:
         self._t0 = time.monotonic()
+        self._map_events.start()
         with self._lock:
             self._telemetry_lag_max = 0.0
 

@@ -140,8 +140,10 @@ CONFIG_ARGS=()
 [[ -n "${ARENA_CONFIG:-}" ]] && CONFIG_ARGS=(--config "$(cd "$(dirname "$ARENA_CONFIG")" && pwd)/$(basename "$ARENA_CONFIG")")
 LAYOUT="$(cd "$REPO_DIR" && "$PYTHON" -m pipeline.drones_battle.core.layout "${CONFIG_ARGS[@]}")"
 MODE="$(echo "$LAYOUT" | awk '/^mode/ {print $2}')"
+EVENTS_PORT="$(echo "$LAYOUT" | awk '/^events/ {print $2}')"
+SLOTS="$(echo "$LAYOUT" | grep -E '^[0-9]')"   # one line per drone
 MAP_MASTERS=""
-COUNT="$(echo "$LAYOUT" | grep -vc '^mode')"
+COUNT="$(echo "$SLOTS" | grep -c .)"
 echo "Starting $COUNT SITL instances (mode: $MODE)..."
 
 while read -r instance sysid lat lon alt heading port map_port team; do
@@ -157,7 +159,7 @@ while read -r instance sysid lat lon alt heading port map_port team; do
         -I$instance --sysid $sysid -l $lat,$lon,$alt,$heading \
         --add-param-file=$ARENA_DIR/arena.parm $outputs"
     sleep 1
-done < <(echo "$LAYOUT" | grep -v '^mode')
+done < <(echo "$SLOTS")
 
 # --- window 1: one MAVProxy map with all six drones ---------------------------
 if [[ "${ARENA_NO_MAP:-0}" != "1" ]]; then
@@ -166,14 +168,14 @@ if [[ "${ARENA_NO_MAP:-0}" != "1" ]]; then
     # mavproxy_arena.py (a MAVProxy module from this repository) draws attackers red and
     # defenders blue and fits the view to the drones (it hides the standard icons itself,
     # so if it fails to load the map still shows the drones).
-    map_teams="$(echo "$LAYOUT" | grep -v '^mode' |
+    map_teams="$(echo "$SLOTS" |
         awk '{ printf "%s%s:%s", (NR > 1 ? "," : ""), $2, ($9 == "attackers" ? "red" : "blue") }')"
     # The module opens the map itself (with a longer start-up limit than MAVProxy's 5 s).
     # No extra "module load map": MAVProxy would open a second map window ("Map2").
     map_cmds="module load pipeline.drones_battle.mavproxy_arena"
     # Shape of the window that place_map_window gives the map (left half of the work area).
     map_aspect="$(work_area | awk '{ printf "%.3f\n", ($3 / 2) / ($4 - 32) }')"
-    launch "map" "${ACTIVATE}export PYTHONPATH=$REPO_DIR ARENA_MAP_TEAMS=$map_teams ARENA_MAP_ASPECT=$map_aspect && \
+    launch "map" "${ACTIVATE}export PYTHONPATH=$REPO_DIR ARENA_MAP_TEAMS=$map_teams ARENA_MAP_ASPECT=$map_aspect ARENA_MAP_EVENTS_PORT=$EVENTS_PORT && \
         $MAVPROXY $MAP_MASTERS --cmd='$map_cmds'"
     place_map_window &
 fi

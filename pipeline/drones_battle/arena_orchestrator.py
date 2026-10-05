@@ -169,6 +169,9 @@ class Match:
                 self._log(event.describe())
                 if event.kind is EventKind.HIT and event.victim is not None:
                     self.backend.kill(event.victim, game.kill_mode)
+                    report_hit = getattr(self.backend, "report_hit", None)  # SITL: explosion on the map
+                    if report_hit is not None:
+                        report_hit(event.victim, event.actor, event.position)
                     if event.position is not None:
                         self.hits.append(event.position)
             result = outcome.result

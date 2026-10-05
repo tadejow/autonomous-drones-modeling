@@ -138,3 +138,23 @@ def test_5v5_layout_and_ports() -> None:
     assert len(slots) == 10
     assert [s.team for s in slots].count("defenders") == 5
     assert connection_string(config, slots[-1]) == "udp:127.0.0.1:14640"
+
+
+def test_every_hit_is_reported_to_the_map_backend() -> None:
+    from pipeline.drones_battle.core.types import EventKind
+
+    class ReportingBackend(KinematicBackend):
+        def __init__(self, config: ArenaConfig) -> None:
+            super().__init__(config, seed=1)
+            self.reports: list[tuple] = []
+
+        def report_hit(self, victim, by, position) -> None:
+            self.reports.append((victim, by, position))
+
+    backend = ReportingBackend(INLINE)
+    result = run_match(INLINE, defender_ref="pipeline.drones_battle.teams.hunters.defender", fast=True,
+                       visualize=False, verbose=False, backend=backend)
+    hits = [e for e in result.events if e.kind is EventKind.HIT]
+    assert hits, "the hunters defence should shoot something down"
+    assert [(v, b) for v, b, _ in backend.reports] == [(e.victim, e.actor) for e in hits]
+    assert all(position is not None for _, _, position in backend.reports)

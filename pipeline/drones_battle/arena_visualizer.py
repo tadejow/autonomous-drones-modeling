@@ -108,6 +108,11 @@ def _wmctrl_place(title: str, x: int, y: int, width: int, height: int) -> None:
             return
 
 
+def _smooth(previous: Optional[float], value: float) -> float:
+    """Exponential moving average used for the on-screen timings."""
+    return value if previous is None else (1 - DELAY_SMOOTHING) * previous + DELAY_SMOOTHING * value
+
+
 class ArenaVisualizer:
     def __init__(
         self,
@@ -165,6 +170,9 @@ class ArenaVisualizer:
         self._delay: Optional[float] = None
         self._max_delay = 0.0
         self._frame_times: deque[float] = deque(maxlen=20)
+        self._draw_ms: Optional[float] = None
+        self._screen_ms: Optional[float] = None
+        self.full_redraws = 0
         self.fig.canvas.mpl_connect("draw_event", self._on_draw)
         self._layout_retries = list(LAYOUT_RETRIES_S)
         self._mapped_at: Optional[float] = None
@@ -338,9 +346,14 @@ class ArenaVisualizer:
         the whole figure every time (see the module docstring), so the frame is
         blitted and the GUI events are flushed instead.
         """
+        started = time.perf_counter()
         self.render(drones_state, hud)
         self.present()
-        self.fig.canvas.flush_events()
+        drawn = time.perf_counter()
+        self.fig.canvas.flush_events()  # the GUI copies the image to the screen here
+        shown = time.perf_counter()
+        self._draw_ms = _smooth(self._draw_ms, 1000.0 * (drawn - started))
+        self._screen_ms = _smooth(self._screen_ms, 1000.0 * (shown - drawn))
         self.apply_window_layout()
 
     def _draw_dynamic(self) -> None:
@@ -365,6 +378,7 @@ class ArenaVisualizer:
             for text in (self.hud_text, self.events_text, self.stats_text):
                 text.draw(event.renderer)
             return
+        self.full_redraws += 1
         self._background = self.fig.canvas.copy_from_bbox(self.fig.bbox)
         self._draw_dynamic()
 
@@ -390,17 +404,26 @@ class ArenaVisualizer:
         now = time.time()
         delay = max(now - sent_at, 0.0)
         self._max_delay = max(self._max_delay, delay)
-        self._delay = delay if self._delay is None else (1 - DELAY_SMOOTHING) * self._delay + DELAY_SMOOTHING * delay
+        self._delay = _smooth(self._delay, delay)
         self._frame_times.append(now)
-        fps = 0.0
-        if len(self._frame_times) > 1:
-            fps = (len(self._frame_times) - 1) / max(self._frame_times[-1] - self._frame_times[0], 1e-6)
-        self.stats_text.set_text(f"view delay {self._delay:.2f} s  |  {fps:.0f} frames/s")
+        self.stats_text.set_text(self._stats_line())
+
+    def _fps(self) -> float:
+        if len(self._frame_times) < 2:
+            return 0.0
+        return (len(self._frame_times) - 1) / max(self._frame_times[-1] - self._frame_times[0], 1e-6)
+
+    def _stats_line(self) -> str:
+        """Delay and where the time goes: drawing (matplotlib) vs. copying to the screen (GUI, X server)."""
+        line = f"view delay {self._delay or 0.0:.2f} s | {self._fps():.0f} frames/s"
+        if self._draw_ms is not None and self._screen_ms is not None:
+            line += f" | draw {self._draw_ms:.0f} ms, screen {self._screen_ms:.0f} ms"
+        return line + f" | full redraws {self.full_redraws}"
 
     def delay_summary(self) -> str:
         if self._delay is None:
             return "3D view: no frames"
-        return f"3D view: delay {self._delay:.2f} s (max {self._max_delay:.2f} s)"
+        return f"3D view: {self._stats_line()} (max delay {self._max_delay:.2f} s)"
 
     def is_open(self) -> bool:
         return plt.fignum_exists(self.fig.number)

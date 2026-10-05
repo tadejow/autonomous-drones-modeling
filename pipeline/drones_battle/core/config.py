@@ -100,6 +100,7 @@ class SitlSection:
     connection_mode: ConnectionMode = "udp"
     udp_base_port: int = 14550
     map_udp_base_port: int = 14650
+    map_events_port: int = 14800
     tcp_base_port: int = 5760
     port_step: int = 10
     connect_timeout_s: float = 60.0

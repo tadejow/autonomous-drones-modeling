@@ -1,7 +1,10 @@
 """The MAVProxy map module, tested against a minimal stand-in for MAVProxy."""
 
 import importlib
+import json
+import socket
 import sys
+import time
 import types
 from types import SimpleNamespace
 
@@ -16,7 +19,10 @@ class FakeSlipMap:
         return filename
 
     def add_object(self, obj: object) -> None:
-        self.calls.append(("add", obj.key, obj.img))
+        self.calls.append(("add", obj.key, obj.img, getattr(obj, "label", None)))
+
+    def remove_object(self, key: str) -> None:
+        self.calls.append(("remove", key))
 
     def set_position(self, key, latlon, rotation=0, label=None, colour=None) -> None:
         self.calls.append(("pos", key, latlon, label))
@@ -50,8 +56,8 @@ def arena_module(monkeypatch: pytest.MonkeyPatch):
             return timeout  # the test only checks which limit is used
 
     class SlipIcon:
-        def __init__(self, key, latlon, img, **_kwargs):
-            self.key, self.img = key, img
+        def __init__(self, key, latlon, img, label=None, **_kwargs):
+            self.key, self.img, self.label = key, img, label
 
     fake = {
         "MAVProxy": types.ModuleType("MAVProxy"),
@@ -70,8 +76,15 @@ def arena_module(monkeypatch: pytest.MonkeyPatch):
     for name, module in fake.items():
         monkeypatch.setitem(sys.modules, name, module)
     monkeypatch.setenv("ARENA_MAP_TEAMS", "1:red,2:red,4:blue,5:blue")
+    monkeypatch.setenv("ARENA_MAP_EVENTS_PORT", str(_free_udp_port()))
     sys.modules.pop("pipeline.drones_battle.mavproxy_arena", None)
     return importlib.import_module("pipeline.drones_battle.mavproxy_arena")
+
+
+def _free_udp_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
 
 
 class FakeSettings:
@@ -164,3 +177,82 @@ def test_without_map_or_teams(arena_module, monkeypatch: pytest.MonkeyPatch) -> 
     module.fit_view()
     assert module.positions == {3: pytest.approx((-35.3615, 149.165))}
     assert arena_module.parse_teams("1:red 6:blue") == {1: "red", 6: "blue"}
+
+
+def _deliver(module) -> None:
+    """Lets the datagrams arrive, then runs MAVProxy's idle hook."""
+    time.sleep(0.1)
+    module.idle_task()
+
+
+def test_kills_hide_drones_and_show_one_explosion_per_collision(arena_module, monkeypatch) -> None:
+    from pipeline.drones_battle.core.map_events import MapEvents
+
+    slipmap = FakeSlipMap()
+    module = arena_module.init(_mpstate(slipmap))
+    for sysid, lat in ((1, -35.36155), (4, -35.36335)):
+        module.mavlink_packet(_position(sysid, lat, 149.165))
+    events = MapEvents(module.events.getsockname()[1])
+
+    # Kamikaze collision: both drones die at (almost) the same point -> one explosion "1+4".
+    events.kill(1, 4, -35.3625, 149.165)
+    events.kill(4, 1, -35.3625, 149.1650001)
+    _deliver(module)
+    assert ("remove", "ArenaDrone1") in slipmap.calls and ("remove", "ArenaDrone4") in slipmap.calls
+    explosions = [c for c in slipmap.calls if c[0] == "add" and c[1].startswith("ArenaExplosion")]
+    assert {c[1] for c in explosions} == {"ArenaExplosion1"}
+    assert explosions[-1][3] == "1+4"
+    assert explosions[-1][2].shape == (64, 64, 3)
+
+    # A destroyed drone is no longer drawn even though it keeps sending positions (LAND).
+    slipmap.calls.clear()
+    module.mavlink_packet(_position(1, -35.3625, 149.165))
+    assert not [c for c in slipmap.calls if c[1] == "ArenaDrone1"]
+
+    # After the flash the explosion shrinks to a dim marker (same key, smaller image).
+    created = module.explosions[0].created
+    with monkeypatch.context() as later:
+        later.setattr(arena_module.time, "time", lambda: created + arena_module.EXPLOSION_FLASH_S + 0.1)
+        module.idle_task()
+    assert slipmap.calls[-1][1] == "ArenaExplosion1" and slipmap.calls[-1][2].shape[0] < 64
+
+    # A new battle: explosions disappear and every drone is drawn again.
+    events.start()
+    _deliver(module)
+    assert ("remove", "ArenaExplosion1") in slipmap.calls
+    module.mavlink_packet(_position(1, -35.36155, 149.165))
+    assert slipmap.calls[-2][:2] == ("add", "ArenaDrone1")
+    events.close()
+
+
+def test_separate_hits_get_separate_explosions(arena_module) -> None:
+    slipmap = FakeSlipMap()
+    module = arena_module.init(_mpstate(slipmap))
+    module.handle_event({"event": "kill", "sysid": 1, "lat": -35.3625, "lon": 149.165})
+    module.handle_event({"event": "kill", "sysid": 2, "lat": -35.3620, "lon": 149.165})  # ~55 m away
+    module.handle_event({"event": "kill", "lat": 1.0})  # malformed: ignored
+    keys = {c[1] for c in slipmap.calls if c[0] == "add"}
+    assert keys == {"ArenaExplosion1", "ArenaExplosion2"}
+
+
+def test_explosion_icon_is_transparent_around_a_bright_core(arena_module) -> None:
+    icon = arena_module.explosion_icon(64)
+    assert icon.dtype.name == "uint8" and icon.shape == (64, 64, 3)
+    assert icon[0, 0].tolist() == [0, 0, 0]  # black corners: MAVProxy adds icons onto the map
+    assert icon[32, 32].min() > 200  # white-hot centre
+    assert arena_module.explosion_icon(64, 0.5).max() < icon.max()
+
+
+def test_map_events_datagrams() -> None:
+    from pipeline.drones_battle.core.map_events import MapEvents
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as receiver:
+        receiver.bind(("127.0.0.1", 0))
+        receiver.settimeout(2.0)
+        events = MapEvents(receiver.getsockname()[1])
+        events.start()
+        events.kill(3, 6, -35.36, 149.16)
+        messages = [json.loads(receiver.recv(4096)) for _ in range(2)]
+        events.close()
+    assert messages == [{"event": "start"}, {"event": "kill", "sysid": 3, "by": 6, "lat": -35.36, "lon": 149.16}]
+    MapEvents(9).kill(1, None, 0.0, 0.0)  # nobody listening: no exception
