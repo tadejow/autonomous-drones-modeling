@@ -163,12 +163,14 @@ done < <(echo "$LAYOUT" | grep -v '^mode')
 if [[ "${ARENA_NO_MAP:-0}" != "1" ]]; then
     echo "Waiting for the simulators before opening the map..."
     sleep "${ARENA_MAP_DELAY:-25}"
-    # Centre on the middle of the arena, zoom to show both bases, do not follow one drone.
-    # (awk prints a newline: "read" fails at an unterminated line, which "set -e" turns into an exit)
-    read -r map_lat map_lon < <(echo "$LAYOUT" | grep -v '^mode' |
-        awk -v OFMT='%.7f' '{ lat += $3; lon += $4; n++ } END { print lat / n, lon / n }')
-    map_cmds="map center $map_lat $map_lon; map zoom 350; map follow 0"
-    launch "map" "${ACTIVATE}$MAVPROXY $MAP_MASTERS --map --cmd='$map_cmds'"
+    # mavproxy_arena.py (a MAVProxy module from this repository) draws attackers red and
+    # defenders blue and fits the view to the drones; the standard red icons are hidden.
+    map_teams="$(echo "$LAYOUT" | grep -v '^mode' |
+        awk '{ printf "%s%s:%s", (NR > 1 ? "," : ""), $2, ($9 == "attackers" ? "red" : "blue") }')"
+    map_cmds="map set showahrspos 0; map set showgpspos 0; map follow 0"
+    map_cmds+="; module load pipeline.drones_battle.mavproxy_arena"
+    launch "map" "${ACTIVATE}export PYTHONPATH=$REPO_DIR ARENA_MAP_TEAMS=$map_teams && \
+        $MAVPROXY $MAP_MASTERS --map --cmd='$map_cmds'"
     place_map_window &
 fi
 minimize_arena_terminals

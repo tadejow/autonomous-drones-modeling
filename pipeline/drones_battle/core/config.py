@@ -28,11 +28,11 @@ class ArenaSection:
     origin_lat_deg: float = -35.36335
     origin_lon_deg: float = 149.16500
     ground_alt_amsl_m: float = 584.0
-    attacker_start_north_m: float = 150.0
-    start_spacing_m: float = 5.0
+    attacker_start_north_m: float = 200.0
+    start_spacing_m: float = 12.0
     takeoff_alt_m: float = 15.0
     north_min_m: float = -40.0
-    north_max_m: float = 210.0
+    north_max_m: float = 260.0
     east_min_m: float = -60.0
     east_max_m: float = 60.0
     alt_min_m: float = 3.0

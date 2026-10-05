@@ -103,8 +103,9 @@ def test_layout_matches_specification() -> None:
     from pipeline.drones_battle.core.layout import drone_slots
 
     slots = {s.drone_id: s for s in drone_slots(ArenaConfig())}
-    assert [slots[i].start_ned[0] for i in (1, 2, 3)] == [150.0] * 3
-    assert np.diff([slots[i].start_ned[1] for i in (4, 5, 6)]).tolist() == [5.0, 5.0]
+    arena = ArenaConfig().arena
+    assert [slots[i].start_ned[0] for i in (1, 2, 3)] == [arena.attacker_start_north_m] * 3
+    assert np.diff([slots[i].start_ned[1] for i in (4, 5, 6)]).tolist() == [arena.start_spacing_m] * 2
     assert slots[1].instance == 0 and slots[6].instance == 5
 
 
