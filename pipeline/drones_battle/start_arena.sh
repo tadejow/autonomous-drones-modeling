@@ -153,9 +153,7 @@ while read -r instance sysid lat lon alt heading port map_port team; do
     else
         # --no-extra-ports: sim_vehicle.py would add its own --out 127.0.0.1:(14550 + 10 i), the
         # orchestrator's port, and every message would then reach the orchestrator twice.
-        # --streamrate=-1: MAVProxy would otherwise re-request ALL streams at 4 Hz every few
-        # seconds, which resets GLOBAL_POSITION_INT from our 10 Hz back to 4 Hz.
-        outputs="--no-extra-ports --mavproxy-args=--streamrate=-1 --out=udp:127.0.0.1:$port --out=udp:127.0.0.1:$map_port"
+        outputs="--no-extra-ports --out=udp:127.0.0.1:$port --out=udp:127.0.0.1:$map_port"
         MAP_MASTERS+=" --master=udp:127.0.0.1:$map_port"
     fi
     echo "  SysID $sysid ($team): $lat, $lon, heading $heading -> port $port"
@@ -180,7 +178,7 @@ if [[ "${ARENA_NO_MAP:-0}" != "1" ]]; then
     # Shape of the window that place_map_window gives the map (left half of the work area).
     map_aspect="$(work_area | awk '{ printf "%.3f\n", ($3 / 2) / ($4 - 32) }')"
     launch "map" "${ACTIVATE}export PYTHONPATH=$REPO_DIR ARENA_MAP_TEAMS=$map_teams ARENA_MAP_ASPECT=$map_aspect ARENA_MAP_EVENTS_PORT=$EVENTS_PORT && \
-        $MAVPROXY $MAP_MASTERS --streamrate=-1 --cmd='$map_cmds'"
+        $MAVPROXY $MAP_MASTERS --cmd='$map_cmds'"
     place_map_window &
 fi
 minimize_arena_terminals

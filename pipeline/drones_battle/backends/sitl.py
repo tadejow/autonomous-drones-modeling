@@ -35,6 +35,7 @@ VELOCITY_ONLY_MASK = 0b0000111111000111
 FORCE_DISARM_MAGIC = 21196
 GLOBAL_POSITION_INT_ID = 33
 MAX_EXTRAPOLATION_S = 0.3
+RATE_REQUEST_PERIOD_S = 1.0
 SLOT_TOLERANCE_M = 3.0
 
 
@@ -65,6 +66,7 @@ class SitlBackend:
         self._duplicates = 0
         self._lock = threading.Lock()
         self._killed: set[int] = set()
+        self._rate_requested_at = 0.0
         self._t0 = time.monotonic()
 
     # ------------------------------------------------------------------ setup
@@ -210,13 +212,16 @@ class SitlBackend:
         self._map_events.kill(victim, by, lat, lon)
 
     def step(self, dt: float) -> None:
-        pass
+        # MAVProxy re-requests all streams at its 4 Hz every few seconds, which resets our
+        # 10 Hz GLOBAL_POSITION_INT; asking again every second keeps the positions at 10 Hz.
+        now = time.monotonic()
+        if now - self._rate_requested_at >= RATE_REQUEST_PERIOD_S:
+            self._rate_requested_at = now
+            for vehicle in self.vehicles.values():
+                self._request_position_rate(vehicle)
 
     def start_clock(self) -> None:
-        # Ask again at the start of every battle: any REQUEST_DATA_STREAM sent since connecting
-        # (a ground station, MAVProxy) resets the position rate of the autopilot.
-        for vehicle in self.vehicles.values():
-            self._request_position_rate(vehicle)
+        self._rate_requested_at = 0.0  # ask for the position rate in the first tick
         self._t0 = time.monotonic()
         self._map_events.start()
         with self._lock:
