@@ -64,9 +64,13 @@ Terminal wybierany jest automatycznie (najpierw `xfce4-terminal`, potem `xterm`)
 Labgate daje pełny pulpit, więc wszystko działa jak lokalnie. Skrypt sam wybierze `xfce4-terminal` (pulpit XFCE, jak w module 05):
 
 ```bash
-cd ~/autonomous-drones-modeling && git checkout claude/project-thread-ogz232
-source venv/bin/activate          # pierwszy raz: python3 -m venv venv && pip install -r requirements.txt
+cd ~/autonomous-drones-modeling && git checkout main && git pull
+source venv/bin/activate          # pierwszy raz: python3 -m venv venv
+pip install -r requirements-sitl.txt   # dronekit itd. + pexpect i MAVProxy dla sim_vehicle.py
 pip install tomli                 # tylko dla Pythona < 3.11
+# Symulatory i mapa MAVProxy startują w ~/venv-ardupilot (środowisko z instalatora ArduPilota,
+# ma wxPython potrzebny mapie), jeśli istnieje; inne miejsce: ARDUPILOT_VENV=/ścieżka.
+# Bez wxPython skrypt pomija mapę i podpowiada --topdown (mapa z góry w oknie 3D).
 ./pipeline/drones_battle/start_arena.sh
 python -m pipeline.drones_battle.arena_orchestrator --backend sitl
 ```
@@ -282,6 +286,7 @@ python -m pipeline.drones_battle.tournament --rounds 10 --set safety.defender_ma
 ## Testy
 
 ```bash
+pip install -r requirements-dev.txt   # pytest (raz)
 python -m pytest pipeline/drones_battle/tests
 ```
 

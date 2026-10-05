@@ -65,7 +65,11 @@ cd autonomous-drones-modeling
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+pip install -r requirements-sitl.txt   # pexpect i MAVProxy: potrzebne, gdy SITL startuje z tego venv
+pip install -r requirements-dev.txt    # pytest: tylko do uruchamiania testów
 ```
+
+`sim_vehicle.py` i MAVProxy uruchamiają się interpreterem `python3` z aktywnego środowiska wirtualnego. Bez `requirements-sitl.txt` okna symulatorów kończą się błędem `ModuleNotFoundError: No module named 'pexpect'`.
 
 ---
 

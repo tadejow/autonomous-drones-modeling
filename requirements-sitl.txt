@@ -1,0 +1,6 @@
+# Everything needed to run ArduPilot SITL from this virtual environment
+# (sim_vehicle.py and MAVProxy run with the venv's python3, so they need these too).
+#   pip install -r requirements-sitl.txt
+-r requirements.txt
+pexpect
+MAVProxy

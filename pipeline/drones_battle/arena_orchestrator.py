@@ -373,6 +373,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--fast", action="store_true", help="kinematic only: no real-time pacing")
     parser.add_argument("--no-viz", action="store_true", help="do not open the 3D views")
     parser.add_argument("--inline", action="store_true", help="run strategies in-process (debugging)")
+    parser.add_argument("--topdown", action="store_true", help="add a 2D top-down map to the 3D window")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--jitter", type=float, default=0.0, help="kinematic only: random start offset (m)")
     parser.add_argument("--record", default=None, help="JSONL file (default: matches/<timestamp>.jsonl)")
@@ -382,6 +383,8 @@ def main(argv: Optional[list[str]] = None) -> None:
     config = load_config(args.config)
     if args.inline:
         config = config.with_overrides(sandbox={"isolation": "inline"})
+    if args.topdown:
+        config = config.with_overrides(visualization={"topdown": True})
     record = None
     if not args.no_record:
         stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")

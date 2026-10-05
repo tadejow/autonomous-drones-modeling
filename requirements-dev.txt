@@ -1,0 +1,4 @@
+# Tests (python -m pytest pipeline/drones_battle/tests).
+#   pip install -r requirements-dev.txt
+-r requirements.txt
+pytest
