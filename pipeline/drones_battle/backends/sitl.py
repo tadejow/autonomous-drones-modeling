@@ -73,9 +73,8 @@ class SitlBackend:
         address = connection_string(self.config, slot)
         print(f"  drone {slot.drone_id} ({slot.team}) -> {address}")
         vehicle = connect(address, wait_ready=True, timeout=self.config.sitl.connect_timeout_s)
-        vehicle.parameters["BATT_FS_LOW_ACT"] = 0
-        vehicle.parameters["BATT_FS_CRT_ACT"] = 0
-        vehicle.parameters["WPNAV_SPEED"] = 1500.0  # cm/s; commands are capped lower by the Safety Limiter
+        # BATT_FS_*, WPNAV_SPEED etc. come from arena.parm at SITL start; setting them here again
+        # timed out with six vehicles connecting at once ("timeout setting parameter WPNAV_SPEED").
         if self.config.sitl.wind_speed_mps > 0:
             vehicle.parameters["SIM_WIND_SPD"] = self.config.sitl.wind_speed_mps
             vehicle.parameters["SIM_WIND_DIR"] = self.config.sitl.wind_direction_deg

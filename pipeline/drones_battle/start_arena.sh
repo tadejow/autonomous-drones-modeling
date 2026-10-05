@@ -21,6 +21,9 @@
 #                   when it exists (the one from ArduPilot's install script, it has wxPython
 #                   for the map); otherwise the current python3 is used
 #   ARENA_NO_MAP=1  skip the MAVProxy map
+#   ARENA_MAP_DELAY seconds to wait before opening the map (default 25). MAVProxy gives the
+#                   map window only 5 s to start; while six simulators are booting that is
+#                   often too little ("map not ready": a blank window that never shows drones)
 #   ARENA_CONFIG    configuration file (default arena_config.toml), e.g. arena_config_5v5.toml;
 #                   pass the same file to the orchestrator with --config
 set -euo pipefail
@@ -158,8 +161,12 @@ done < <(echo "$LAYOUT" | grep -v '^mode')
 # --- window 1: one MAVProxy map with all six drones ---------------------------
 if [[ "${ARENA_NO_MAP:-0}" != "1" ]]; then
     echo "Waiting for the simulators before opening the map..."
-    sleep 10
-    launch "map" "${ACTIVATE}$MAVPROXY $MAP_MASTERS --map"
+    sleep "${ARENA_MAP_DELAY:-25}"
+    # Centre on the middle of the arena, zoom to show both bases, do not follow one drone.
+    read -r map_lat map_lon < <(echo "$LAYOUT" | grep -v '^mode' |
+        awk '{ lat += $3; lon += $4; n++ } END { printf "%.7f %.7f", lat / n, lon / n }')
+    map_cmds="map center $map_lat $map_lon; map zoom 350; map follow 0"
+    launch "map" "${ACTIVATE}$MAVPROXY $MAP_MASTERS --map --cmd='$map_cmds'"
     place_map_window &
 fi
 minimize_arena_terminals
