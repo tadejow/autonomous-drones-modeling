@@ -38,6 +38,13 @@ if ! ls "$ARDUPILOT_DIR"/build/sitl/bin/arducopter >/dev/null 2>&1; then
     echo "ERROR: ArduCopter SITL is not built. Run once: cd $ARDUPILOT_DIR && ./waf configure --board sitl && ./waf copter"
     exit 1
 fi
+missing="$("$PYTHON" -c 'import importlib.util as u; print(" ".join(m for m in ("pexpect", "MAVProxy") if u.find_spec(m) is None))' 2>/dev/null || echo "?")"
+if [[ -n "$missing" ]] || ! command -v mavproxy.py >/dev/null 2>&1; then
+    echo "ERROR: sim_vehicle.py and MAVProxy run with '$("$PYTHON" -c 'import sys; print(sys.executable)' 2>/dev/null || echo "$PYTHON")',"
+    echo "       which is missing: ${missing:-mavproxy.py on PATH}. Install them into this environment:"
+    echo "         pip install -r $REPO_DIR/requirements-sitl.txt"
+    exit 1
+fi
 if [[ "$TERMINAL" == "auto" ]]; then
     TERMINAL=none
     for candidate in xfce4-terminal xterm; do
