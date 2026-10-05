@@ -213,6 +213,10 @@ class SitlBackend:
         pass
 
     def start_clock(self) -> None:
+        # Ask again at the start of every battle: any REQUEST_DATA_STREAM sent since connecting
+        # (a ground station, MAVProxy) resets the position rate of the autopilot.
+        for vehicle in self.vehicles.values():
+            self._request_position_rate(vehicle)
         self._t0 = time.monotonic()
         self._map_events.start()
         with self._lock:

@@ -150,7 +150,7 @@ def analyze_recording(
     if late:
         lines.append("Strategy answers later than the tick budget: " + ", ".join(late))
     telemetry = stats.get("telemetry")
-    if telemetry:
+    if telemetry and "position_rate_min_hz" in telemetry:  # older recordings only have the delay
         lines.append(
             f"SITL telemetry: {telemetry.get('position_rate_min_hz', 0):.1f}-"
             f"{telemetry.get('position_rate_max_hz', 0):.1f} positions/s per drone, max delay "
