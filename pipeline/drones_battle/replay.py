@@ -4,6 +4,7 @@ Examples::
 
     python -m pipeline.drones_battle.replay pipeline/drones_battle/matches/2026-10-12_101500.jsonl
     python -m pipeline.drones_battle.replay match.jsonl --save battle.gif --fps 10
+    python -m pipeline.drones_battle.replay latest --analyze    # near misses etc. of the newest match
 
 Controls in the window: the slider at the bottom moves through time, the space
 bar pauses and resumes.
@@ -12,12 +13,27 @@ bar pauses and resumes.
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 from typing import Any, Optional
 
-from pipeline.drones_battle.arena_visualizer import ArenaVisualizer, plt
+from pipeline.drones_battle.arena_visualizer import ArenaVisualizer
 from pipeline.drones_battle.core.config import ArenaConfig
+from pipeline.drones_battle.core.match_analysis import analyze_recording
 from pipeline.drones_battle.core.recorder import read_recording
 from pipeline.drones_battle.core.types import EventKind, GameEvent
+
+
+MATCHES_DIR = Path(__file__).resolve().parent / "matches"
+
+
+def resolve_recording(name: str) -> Path:
+    """``latest`` = the newest recording in ``matches/`` (where the orchestrator saves every match)."""
+    if name != "latest":
+        return Path(name)
+    recordings = sorted(MATCHES_DIR.glob("*.jsonl"), key=lambda p: p.stat().st_mtime)
+    if not recordings:
+        raise SystemExit(f"No recordings in {MATCHES_DIR}")
+    return recordings[-1]
 
 
 def _config_from_header(header: dict[str, Any]) -> ArenaConfig:
@@ -64,7 +80,9 @@ def build_huds(frames: list[dict[str, Any]], config: ArenaConfig, result: Option
 
 def main(argv: Optional[list[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Replay a recorded drone battle.")
-    parser.add_argument("recording")
+    parser.add_argument("recording", help="JSONL file, or 'latest' for the newest file in matches/")
+    parser.add_argument("--analyze", action="store_true",
+                        help="print closest approaches, altitudes, telemetry and loop timing (no window)")
     parser.add_argument("--save", default=None, help="output .gif or .mp4 (needs ffmpeg for mp4)")
     parser.add_argument("--fps", type=int, default=10)
     parser.add_argument("--dpi", type=int, default=60, help="resolution of the exported file")
@@ -72,9 +90,15 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--topdown", action="store_true")
     args = parser.parse_args(argv)
 
-    header, frames, result = read_recording(args.recording)
+    path = resolve_recording(args.recording)
+    header, frames, result = read_recording(path)
     if not frames:
         raise SystemExit("The recording has no frames.")
+    if args.analyze:
+        print(f"Recording: {path}")
+        for line in analyze_recording(header, frames, result):
+            print(line)
+        return
     frames = frames[:: max(args.step, 1)]
     config = _config_from_header(header)
     huds = build_huds(frames, config, result)
@@ -89,6 +113,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         for past in frames[start:index]:
             visualizer.render(past["drones"])
         visualizer.render(frames[index]["drones"], huds[index])
+        visualizer.present()
 
     if args.save:
         from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
@@ -127,11 +152,13 @@ def main(argv: Optional[list[str]] = None) -> None:
         if state["playing"] and state["index"] < len(frames) - 1:
             state["index"] += 1
             visualizer.render(frames[state["index"]]["drones"], huds[state["index"]])
-            state["internal"] = True
-            slider.set_val(state["index"])
-            state["internal"] = False
-        plt.pause(1.0 / args.fps)
-        visualizer.apply_window_layout()
+            visualizer.present()
+            # Moving the slider redraws the whole figure, so only every 10th frame.
+            if state["index"] % 10 == 0 or state["index"] == len(frames) - 1:
+                state["internal"] = True
+                slider.set_val(state["index"])
+                state["internal"] = False
+        visualizer.idle(1.0 / args.fps)
 
 
 if __name__ == "__main__":

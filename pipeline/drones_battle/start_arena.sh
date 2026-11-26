@@ -21,6 +21,9 @@
 #                   when it exists (the one from ArduPilot's install script, it has wxPython
 #                   for the map); otherwise the current python3 is used
 #   ARENA_NO_MAP=1  skip the MAVProxy map
+#   ARENA_MAP_DELAY seconds to wait before opening the map (default 15), so that the
+#                   simulators are up; mavproxy_arena.py then gives the map window up to 60 s
+#                   to start (MAVProxy alone allows 5 s and leaves a blank window otherwise)
 #   ARENA_CONFIG    configuration file (default arena_config.toml), e.g. arena_config_5v5.toml;
 #                   pass the same file to the orchestrator with --config
 set -euo pipefail
@@ -100,7 +103,8 @@ launch() {  # $1 = name, $2 = command; terminal windows start minimized
 minimize_arena_terminals() {  # fallback for window managers that ignore --minimize / -iconic
     command -v xdotool >/dev/null 2>&1 || return 0
     local window
-    for window in $(xdotool search --name '^arena-' 2>/dev/null); do
+    # arena-* = our terminals, ArduCopter = the xterm that sim_vehicle.py opens for each simulator
+    for window in $(xdotool search --name '^(arena-|ArduCopter)' 2>/dev/null); do
         xdotool windowminimize "$window" 2>/dev/null || true
     done
 }
@@ -136,8 +140,10 @@ CONFIG_ARGS=()
 [[ -n "${ARENA_CONFIG:-}" ]] && CONFIG_ARGS=(--config "$(cd "$(dirname "$ARENA_CONFIG")" && pwd)/$(basename "$ARENA_CONFIG")")
 LAYOUT="$(cd "$REPO_DIR" && "$PYTHON" -m pipeline.drones_battle.core.layout "${CONFIG_ARGS[@]}")"
 MODE="$(echo "$LAYOUT" | awk '/^mode/ {print $2}')"
+EVENTS_PORT="$(echo "$LAYOUT" | awk '/^events/ {print $2}')"
+SLOTS="$(echo "$LAYOUT" | grep -E '^[0-9]')"   # one line per drone
 MAP_MASTERS=""
-COUNT="$(echo "$LAYOUT" | grep -vc '^mode')"
+COUNT="$(echo "$SLOTS" | grep -c .)"
 echo "Starting $COUNT SITL instances (mode: $MODE)..."
 
 while read -r instance sysid lat lon alt heading port map_port team; do
@@ -145,7 +151,9 @@ while read -r instance sysid lat lon alt heading port map_port team; do
         outputs="--no-mavproxy"
         MAP_MASTERS+=" --master=tcp:127.0.0.1:$map_port"
     else
-        outputs="--out=udp:127.0.0.1:$port --out=udp:127.0.0.1:$map_port"
+        # --no-extra-ports: sim_vehicle.py would add its own --out 127.0.0.1:(14550 + 10 i), the
+        # orchestrator's port, and every message would then reach the orchestrator twice.
+        outputs="--no-extra-ports --out=udp:127.0.0.1:$port --out=udp:127.0.0.1:$map_port"
         MAP_MASTERS+=" --master=udp:127.0.0.1:$map_port"
     fi
     echo "  SysID $sysid ($team): $lat, $lon, heading $heading -> port $port"
@@ -153,13 +161,24 @@ while read -r instance sysid lat lon alt heading port map_port team; do
         -I$instance --sysid $sysid -l $lat,$lon,$alt,$heading \
         --add-param-file=$ARENA_DIR/arena.parm $outputs"
     sleep 1
-done < <(echo "$LAYOUT" | grep -v '^mode')
+done < <(echo "$SLOTS")
 
 # --- window 1: one MAVProxy map with all six drones ---------------------------
 if [[ "${ARENA_NO_MAP:-0}" != "1" ]]; then
     echo "Waiting for the simulators before opening the map..."
-    sleep 10
-    launch "map" "${ACTIVATE}$MAVPROXY $MAP_MASTERS --map"
+    sleep "${ARENA_MAP_DELAY:-15}"
+    # mavproxy_arena.py (a MAVProxy module from this repository) draws attackers red and
+    # defenders blue and fits the view to the drones (it hides the standard icons itself,
+    # so if it fails to load the map still shows the drones).
+    map_teams="$(echo "$SLOTS" |
+        awk '{ printf "%s%s:%s", (NR > 1 ? "," : ""), $2, ($9 == "attackers" ? "red" : "blue") }')"
+    # The module opens the map itself (with a longer start-up limit than MAVProxy's 5 s).
+    # No extra "module load map": MAVProxy would open a second map window ("Map2").
+    map_cmds="module load pipeline.drones_battle.mavproxy_arena"
+    # Shape of the window that place_map_window gives the map (left half of the work area).
+    map_aspect="$(work_area | awk '{ printf "%.3f\n", ($3 / 2) / ($4 - 32) }')"
+    launch "map" "${ACTIVATE}export PYTHONPATH=$REPO_DIR ARENA_MAP_TEAMS=$map_teams ARENA_MAP_ASPECT=$map_aspect ARENA_MAP_EVENTS_PORT=$EVENTS_PORT && \
+        $MAVPROXY $MAP_MASTERS --cmd='$map_cmds'"
     place_map_window &
 fi
 minimize_arena_terminals

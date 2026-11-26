@@ -69,6 +69,8 @@ class Referee:
         self.alive: dict[int, bool] = {drone_id: True for drone_id in config.all_ids}
         self.events: list[GameEvent] = []
         self.target = np.array(config.game.target_ned, dtype=float)
+        # (attacker, defender) -> (smallest distance seen, time): shows near misses after the match.
+        self.closest: dict[tuple[int, int], tuple[float, float]] = {}
 
     def defender_disabled(self, position: np.ndarray) -> bool:
         """Anti-camping rule: a defender inside the exclusion sphere cannot score hits."""
@@ -88,6 +90,7 @@ class Referee:
             if self.alive[i] and not current[i].stale and not self.defender_disabled(current[i].pos)
         ]
         dt = game.dt
+        self._track_closest(previous, current, time_s)
         killed: set[int] = set()
         for attacker in attackers:
             best: Optional[tuple[float, float, int]] = None
@@ -137,6 +140,32 @@ class Referee:
 
         self.events.extend(outcome.events)
         return outcome
+
+    def _track_closest(self, previous: dict[int, RawState], current: dict[int, RawState], time_s: float) -> None:
+        game = self.config.game
+        for attacker in game.attacker_ids:
+            if not self.alive[attacker] or current[attacker].stale:
+                continue
+            for defender in game.defender_ids:
+                if not self.alive[defender] or current[defender].stale:
+                    continue
+                d_min, s_star = closest_approach(
+                    previous[attacker].pos, current[attacker].pos, previous[defender].pos, current[defender].pos,
+                )
+                best = self.closest.get((attacker, defender))
+                if best is None or d_min < best[0]:
+                    self.closest[(attacker, defender)] = (d_min, time_s - (1.0 - s_star) * game.dt)
+
+    def closest_summary(self) -> list[str]:
+        """The nearest approach of each attacker to any defender, closest first."""
+        per_attacker: dict[int, tuple[float, float, int]] = {}
+        for (attacker, defender), (distance, when) in self.closest.items():
+            if attacker not in per_attacker or distance < per_attacker[attacker][0]:
+                per_attacker[attacker] = (distance, when, defender)
+        return [
+            f"{attacker}-{defender} {distance:.1f} m (t={when:.1f} s)"
+            for attacker, (distance, when, defender) in sorted(per_attacker.items(), key=lambda kv: kv[1][0])
+        ]
 
     def forfeit(self, loser: str, time_s: float, detail: str) -> MatchResult:
         winner = "defenders" if loser == "attackers" else "attackers"

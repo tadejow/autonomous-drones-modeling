@@ -110,3 +110,16 @@ def test_stale_drone_is_ignored() -> None:
     layout = _states(_far_layout(d1=(80.0, 0.0, -15.0), d5=(80.5, 0.0, -15.0)))
     layout[5].stale = True
     assert not referee.evaluate(layout, layout, 1.0).hits
+
+
+def test_closest_approach_is_recorded_for_near_misses() -> None:
+    referee = Referee(ArenaConfig())
+    # Attacker 1 passes defender 5 at 3 m: no hit, but the near miss is remembered.
+    before = _states(_far_layout(d1=(81.0, 0.0, -15.0), d5=(79.0, 3.0, -15.0)))
+    after = _states(_far_layout(d1=(79.0, 0.0, -15.0), d5=(81.0, 3.0, -15.0)))
+    outcome = referee.evaluate(before, after, 10.0)
+    assert not outcome.hits
+    distance, when = referee.closest[(1, 5)]
+    assert distance == pytest.approx(3.0)
+    assert when == pytest.approx(10.0 - 0.5 * ArenaConfig().game.dt)
+    assert referee.closest_summary()[0].startswith("1-5 3.0 m")
